@@ -5,15 +5,15 @@ public final class AppIdentity {
   private AppIdentity() {}
 
   public static String applicationId() {
-    return "dsh.android.client";
+    return "com.hydsh.app";
   }
 
   public static String displayName() {
-    return "DSHA";
+    return "HYDSH";
   }
 
   public static String publicDirectoryName() {
-    return "DSHA";
+    return "HYDSH";
   }
 
   public static String defaultUpdateFeed() {
