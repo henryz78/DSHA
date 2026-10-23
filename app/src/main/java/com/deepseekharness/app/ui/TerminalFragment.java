@@ -58,7 +58,9 @@ public class TerminalFragment extends Fragment {
         }
       };
   private EditText inputEdit;
-  private TextView outputText, cancelButton;
+  private TextView outputText;
+  private final TerminalHeader header = new TerminalHeader();
+  private TerminalTool cancelButton;
   private ScrollView scrollView;
   private TerminalSessionOwner.SimpleTab active;
   private boolean outputScheduled;
@@ -76,21 +78,40 @@ public class TerminalFragment extends Fragment {
     inputEdit = view.findViewById(R.id.term_input);
     outputText = view.findViewById(R.id.term_output);
     scrollView = view.findViewById(R.id.term_scroll);
-    cancelButton = view.findViewById(R.id.term_ctrlc);
     if (isResumed()) OWNER.attachSimple(observer);
-    cancelButton.setOnClickListener(
-        v -> {
-          if (active != null && !refuseDuringMaintenance()) active.session.cancelAndRestart();
-        });
-    view.findViewById(R.id.term_clear)
-        .setOnClickListener(
-            v -> {
-              if (active != null) active.clearOutput();
-              renderOutput();
+    cancelButton =
+        new TerminalTool(
+            getString(R.string.ui_m0050),
+            () -> {
+              if (active != null && !refuseDuringMaintenance()) active.session.cancelAndRestart();
             });
-    View pty = view.findViewById(R.id.term_pty);
-    if (pty != null) pty.setOnClickListener(v -> switchToPty());
-    view.findViewById(R.id.terminal_new).setOnClickListener(v -> newTerminal());
+    header.setTitle(getString(R.string.ui_m0178));
+    TerminalChromeKt.bindTerminalHeader(
+        view.findViewById(R.id.terminal_header),
+        header,
+        java.util.Arrays.asList(
+            cancelButton,
+            new TerminalTool(
+                getString(R.string.ui_m0164),
+                () -> {
+                  if (active != null) active.clearOutput();
+                  renderOutput();
+                }),
+            new TerminalTool(getString(R.string.ui_terminal_pty), this::switchToPty)),
+        new TerminalChromeActions() {
+          public void select(long id) {
+            saveDraft();
+            if (OWNER.selectSimple(id)) attachSelected();
+          }
+
+          public void close(long id) {
+            closeTerminal(id);
+          }
+
+          public void newTerminal() {
+            TerminalFragment.this.newTerminal();
+          }
+        });
     inputEdit.setOnEditorActionListener(
         (v, action, event) -> {
           if (event != null) {
@@ -116,7 +137,7 @@ public class TerminalFragment extends Fragment {
     saveDraft();
     var tab = OWNER.addSimple(terminalBackend(HarnessController.get(requireContext()).proot()));
     attachSelected();
-    requireView().findViewById(R.id.terminal_new).setEnabled(false);
+    header.setNewEnabled(false);
     tab.value.session.ensureStarted();
   }
 
@@ -147,27 +168,14 @@ public class TerminalFragment extends Fragment {
     if (active != null) renderState(active.session.state());
     else {
       inputEdit.setHint(com.deepseekharness.app.util.UiText.text("点击「新建」打开终端"));
-      getView().findViewById(R.id.terminal_new).setEnabled(true);
+      header.setNewEnabled(true);
     }
     renderOutput();
     renderTabs();
   }
 
   private void renderTabs() {
-    if (getView() == null) return;
-    TerminalTabBar.render(
-        getView(),
-        OWNER.simpleTabs(),
-        new TerminalTabBar.Actions() {
-          public void select(long id) {
-            saveDraft();
-            if (OWNER.selectSimple(id)) attachSelected();
-          }
-
-          public void close(long id) {
-            closeTerminal(id);
-          }
-        });
+    TerminalTabBar.render(header, OWNER.simpleTabs());
   }
 
   private void closeTerminal(long id) {
@@ -236,9 +244,8 @@ public class TerminalFragment extends Fragment {
 
   private void renderState(TerminalSession.State state) {
     if (inputEdit == null || cancelButton == null) return;
-    if (getView() != null)
-      getView().findViewById(R.id.terminal_new).setEnabled(state != TerminalSession.State.STARTING);
-    cancelButton.setText(
+    header.setNewEnabled(state != TerminalSession.State.STARTING);
+    cancelButton.setLabel(
         state == TerminalSession.State.STOPPING
             ? com.deepseekharness.app.util.UiText.text("中止中…")
             : state == TerminalSession.State.FAILED

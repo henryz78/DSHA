@@ -1,6 +1,10 @@
 package com.deepseekharness.app.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -32,6 +36,9 @@ class MainChrome {
       HydshTheme {
         SmallTopAppBar(
           title = title,
+          // SmallTopAppBar 无论如何都会再加一次状态栏高度；外层布局已经留过，这里先标记为已处理，
+          // 否则在系统补发边距（如从网页返回）后顶部会多出一块空白。
+          modifier = Modifier.consumeWindowInsets(WindowInsets.systemBars),
           defaultWindowInsetsPadding = false,
           navigationIcon = {
             if (back)

@@ -86,13 +86,11 @@ public final class PtyTerminalFragment extends Fragment
 
   private HarnessController c;
   private TerminalView view;
-  private TextView title;
+  private final TerminalHeader header = new TerminalHeader();
   private PtySession attachedSession;
   private PtySession.Listener sessionListener;
   private boolean ctrlDown;
   private boolean altDown;
-  private TextView ctrlBtn;
-  private TextView altBtn;
 
   /** 供 MainActivity 决定挂哪一页。 */
   public static boolean preferred(Context ctx) {
@@ -129,20 +127,36 @@ public final class PtyTerminalFragment extends Fragment
   public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
     c = HarnessController.get(requireContext());
     view = root.findViewById(R.id.pty_view);
-    title = root.findViewById(R.id.pty_title);
+    header.setTitle(getString(R.string.ui_terminal_ubuntu_pty));
 
     view.setTerminalViewClient(this);
     applyFontSize(fontSp());
     buildExtraKeys(root.findViewById(R.id.pty_keys));
 
-    root.findViewById(R.id.pty_font_dec).setOnClickListener(v -> bumpFont(-1));
-    root.findViewById(R.id.pty_font_inc).setOnClickListener(v -> bumpFont(+1));
-    root.findViewById(R.id.pty_simple).setOnClickListener(v -> switchToSimple());
-    root.findViewById(R.id.terminal_new).setOnClickListener(v -> startTerminal());
+    TerminalChromeKt.bindTerminalHeader(
+        root.findViewById(R.id.terminal_header),
+        header,
+        java.util.Arrays.asList(
+            new TerminalTool(getString(R.string.ui_font_smaller), () -> bumpFont(-1)),
+            new TerminalTool(getString(R.string.ui_font_larger), () -> bumpFont(+1)),
+            new TerminalTool(getString(R.string.ui_m0177), this::switchToSimple)),
+        new TerminalChromeActions() {
+          public void select(long id) {
+            if (OWNER.selectPty(id)) attachSelected();
+          }
+
+          public void close(long id) {
+            closeTerminal(id);
+          }
+
+          public void newTerminal() {
+            startTerminal();
+          }
+        });
 
     if (!c.proot().isEnvironmentReady()) {
-      title.setText(com.deepseekharness.app.util.UiText.text("环境未就绪 —— 先到「安装」页装完再回来"));
-      root.findViewById(R.id.terminal_new).setEnabled(false);
+      header.setTitle(com.deepseekharness.app.util.UiText.text("环境未就绪 —— 先到「安装」页装完再回来"));
+      header.setNewEnabled(false);
       renderTabs();
       return;
     }
@@ -155,7 +169,7 @@ public final class PtyTerminalFragment extends Fragment
     try {
       String blocked = TerminalFragment.terminalBlockMessage(c.proot());
       if (!blocked.isEmpty()) {
-        title.setText(blocked);
+        header.setTitle(blocked);
         return;
       }
       // 初始 80x24 只是占位：attachSession 之后 TerminalView 会按控件实测的字宽
@@ -165,14 +179,14 @@ public final class PtyTerminalFragment extends Fragment
       attachSelected();
     } catch (Throwable e) {
       String safe = SensitiveData.redact(String.valueOf(e));
-      title.setText(com.deepseekharness.app.util.UiText.format("终端启动失败：%s", safe));
+      header.setTitle(com.deepseekharness.app.util.UiText.format("终端启动失败：%s", safe));
       com.deepseekharness.app.core.DiagnosticLog.record(requireContext(), "PTY_START", safe);
       android.util.Log.w("DSHA", com.deepseekharness.app.util.UiText.format("PTY 启动失败：%s", safe));
     }
   }
 
   private void attachSelected() {
-    if (view == null || title == null || getView() == null) return;
+    if (view == null || getView() == null) return;
     boolean ready = c != null && c.proot().isEnvironmentReady();
     if (attachedSession != null) attachedSession.detachListener(sessionListener);
     attachedSession = null;
@@ -185,8 +199,8 @@ public final class PtyTerminalFragment extends Fragment
     empty.setVisibility(tab == null ? View.VISIBLE : View.GONE);
     view.setVisibility(tab == null ? View.INVISIBLE : View.VISIBLE);
     view.setEnabled(ready && tab != null && !tab.isClosing());
-    getView().findViewById(R.id.terminal_new).setEnabled(ready);
-    if (tab == null) title.setText(com.deepseekharness.app.util.UiText.text("暂无终端"));
+    header.setNewEnabled(ready);
+    if (tab == null) header.setTitle(com.deepseekharness.app.util.UiText.text("暂无终端"));
     else {
       PtySession selected = tab.value;
       attachedSession = selected;
@@ -224,29 +238,17 @@ public final class PtyTerminalFragment extends Fragment
       if (isResumed()) selected.attachListener(sessionListener);
       view.attachSession(selected.session());
       view.onScreenUpdated();
-      title.setText(
+      header.setTitle(
           selected.isRunning()
               ? displayTitle(selected.session())
               : com.deepseekharness.app.util.UiText.text("会话已结束"));
     }
-    if (!ready) title.setText(com.deepseekharness.app.util.UiText.text("环境未就绪 —— 先到「安装」页装完再回来"));
+    if (!ready) header.setTitle(com.deepseekharness.app.util.UiText.text("环境未就绪 —— 先到「安装」页装完再回来"));
     renderTabs();
   }
 
   private void renderTabs() {
-    if (getView() == null) return;
-    TerminalTabBar.render(
-        getView(),
-        OWNER.ptyTabs(),
-        new TerminalTabBar.Actions() {
-          public void select(long id) {
-            if (OWNER.selectPty(id)) attachSelected();
-          }
-
-          public void close(long id) {
-            closeTerminal(id);
-          }
-        });
+    TerminalTabBar.render(header, OWNER.ptyTabs());
   }
 
   private void closeTerminal(long id) {
@@ -285,37 +287,19 @@ public final class PtyTerminalFragment extends Fragment
 
   // ==================== 扩展键 ====================
 
-  private void buildExtraKeys(LinearLayout box) {
+  private void buildExtraKeys(androidx.compose.ui.platform.ComposeView box) {
     if (box == null) return;
-    box.removeAllViews();
-    for (String[] k : KEYS) {
-      TextView b = new TextView(requireContext());
-      b.setText(com.deepseekharness.app.util.UiText.text(k[0]));
-      b.setMinHeight(dp(44));
-      b.setMinWidth(dp(44));
-      b.setGravity(Gravity.CENTER);
-      b.setBackgroundResource(R.drawable.bg_chip);
-      b.setTextColor(getResources().getColor(R.color.text_secondary));
-      b.setTypeface(android.graphics.Typeface.MONOSPACE);
-      b.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-      int padH = dp(11), padV = dp(7);
-      b.setPadding(padH, padV, padH, padV);
-      LinearLayout.LayoutParams lp =
-          new LinearLayout.LayoutParams(
-              LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-      lp.setMarginEnd(dp(6));
-      b.setLayoutParams(lp);
-      final String seq = k[1];
-      final String label = k[0];
-      if (seq == null) {
-        if ("CTRL".equals(label)) ctrlBtn = b;
-        else altBtn = b;
-        b.setOnClickListener(v -> toggleModifier(label));
-      } else {
-        b.setOnClickListener(v -> send(seq));
-      }
-      box.addView(b);
-    }
+    java.util.List<String> labels = new java.util.ArrayList<>();
+    for (String[] k : KEYS) labels.add(com.deepseekharness.app.util.UiText.text(k[0]));
+    TerminalChromeKt.bindTerminalKeys(
+        box,
+        header,
+        labels,
+        index -> {
+          String seq = KEYS[index][1];
+          if (seq == null) toggleModifier(KEYS[index][0]);
+          else send(seq);
+        });
     paintModifiers();
   }
 
@@ -328,12 +312,8 @@ public final class PtyTerminalFragment extends Fragment
   }
 
   private void paintModifiers() {
-    if (ctrlBtn != null) {
-      ctrlBtn.setTextColor(getResources().getColor(ctrlDown ? R.color.ok : R.color.text_secondary));
-    }
-    if (altBtn != null) {
-      altBtn.setTextColor(getResources().getColor(altDown ? R.color.ok : R.color.text_secondary));
-    }
+    header.setCtrl(ctrlDown);
+    header.setAlt(altDown);
   }
 
   private void send(String seq) {
@@ -442,7 +422,6 @@ public final class PtyTerminalFragment extends Fragment
     main.removeCallbacksAndMessages(null);
     redrawPending.set(false);
     view = null;
-    title = null;
     c = null;
     super.onDestroyView();
   }
@@ -471,26 +450,24 @@ public final class PtyTerminalFragment extends Fragment
 
   @Override
   public void onTitle(String t) {
-    final TextView target = title;
+    final View target = getView();
     final PtySession source = attachedSession;
     main.post(
         () -> {
-          if (!isAdded() || target == null || title != target || attachedSession != source) return;
-          if (t != null && !t.trim().isEmpty()) {
-            target.setText(SensitiveData.redact(t.trim()));
-          }
+          if (!isAdded() || target == null || getView() != target || attachedSession != source)
+            return;
+          if (t != null && !t.trim().isEmpty()) header.setTitle(SensitiveData.redact(t.trim()));
         });
   }
 
   @Override
   public void onExit(int status) {
-    final TextView target = title;
+    final View target = getView();
     final PtySession exited = attachedSession;
     main.post(
         () -> {
-          if (isAdded() && target != null && title == target && attachedSession == exited) {
-            target.setText(com.deepseekharness.app.util.UiText.format("会话已结束（退出码 %s）", status));
-          }
+          if (isAdded() && target != null && getView() == target && attachedSession == exited)
+            header.setTitle(com.deepseekharness.app.util.UiText.format("会话已结束（退出码 %s）", status));
         });
   }
 

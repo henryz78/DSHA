@@ -8,4 +8,9 @@
     <item name="app_logo" type="id" />
     <item name="sub_back" type="id" />
     <item name="btn_theme" type="id" />
+    <!-- 旧终端标题栏控件已由 TerminalChrome 取代；debug 审计代码仍引用。 -->
+    <item name="pty_title" type="id" />
+    <item name="pty_font_dec" type="id" />
+    <item name="pty_font_inc" type="id" />
+    <item name="pty_simple" type="id" />
 </resources>
