@@ -127,7 +127,6 @@ public final class PtyTerminalFragment extends Fragment
   public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
     c = HarnessController.get(requireContext());
     view = root.findViewById(R.id.pty_view);
-    header.setTitle(getString(R.string.ui_terminal_ubuntu_pty));
 
     view.setTerminalViewClient(this);
     applyFontSize(fontSp());
@@ -238,10 +237,9 @@ public final class PtyTerminalFragment extends Fragment
       if (isResumed()) selected.attachListener(sessionListener);
       view.attachSession(selected.session());
       view.onScreenUpdated();
+      // 顶部只在有事要说时出一行提示；正常运行时不占位置。
       header.setTitle(
-          selected.isRunning()
-              ? displayTitle(selected.session())
-              : com.deepseekharness.app.util.UiText.text("会话已结束"));
+          selected.isRunning() ? "" : com.deepseekharness.app.util.UiText.text("会话已结束"));
     }
     if (!ready) header.setTitle(com.deepseekharness.app.util.UiText.text("环境未就绪 —— 先到「安装」页装完再回来"));
     renderTabs();
@@ -278,11 +276,6 @@ public final class PtyTerminalFragment extends Fragment
             },
             "dsha-close-terminal")
         .start();
-  }
-
-  private String displayTitle(TerminalSession s) {
-    String t = s == null ? null : s.getTitle();
-    return t == null || t.trim().isEmpty() ? "Ubuntu · PTY" : SensitiveData.redact(t.trim());
   }
 
   // ==================== 扩展键 ====================
@@ -336,6 +329,21 @@ public final class PtyTerminalFragment extends Fragment
       altDown = false;
       paintModifiers();
     }
+  }
+
+  /** 长按粘贴和输入法多行提交共用：整体括号粘贴，不逐行执行。 */
+  private boolean pasteText(String text) {
+    if (!inputAllowed()) return true;
+    PtySession s = attachedSession;
+    var selected = OWNER.currentPty();
+    if (s == null || !s.isRunning() || selected == null || selected.isClosing()) return true;
+    s.paste(text);
+    if (ctrlDown || altDown) {
+      ctrlDown = false;
+      altDown = false;
+      paintModifiers();
+    }
+    return true;
   }
 
   // ==================== 字号与切换 ====================
@@ -420,6 +428,7 @@ public final class PtyTerminalFragment extends Fragment
     attachedSession = null;
     sessionListener = null;
     main.removeCallbacksAndMessages(null);
+    pendingInput.clear();
     redrawPending.set(false);
     view = null;
     c = null;
@@ -450,14 +459,7 @@ public final class PtyTerminalFragment extends Fragment
 
   @Override
   public void onTitle(String t) {
-    final View target = getView();
-    final PtySession source = attachedSession;
-    main.post(
-        () -> {
-          if (!isAdded() || target == null || getView() != target || attachedSession != source)
-            return;
-          if (t != null && !t.trim().isEmpty()) header.setTitle(SensitiveData.redact(t.trim()));
-        });
+    // shell 每次出提示符都会改窗口标题（root@localhost: ~），不再占一行显示。
   }
 
   @Override
@@ -511,7 +513,7 @@ public final class PtyTerminalFragment extends Fragment
                 || cm.getPrimaryClip() == null
                 || cm.getPrimaryClip().getItemCount() == 0) return;
             CharSequence cs = cm.getPrimaryClip().getItemAt(0).coerceToText(requireContext());
-            if (cs != null && cs.length() > 0) send(cs.toString());
+            if (cs != null && cs.length() > 0) pasteText(cs.toString());
           } catch (Throwable ignored) {
           }
         });
@@ -582,6 +584,8 @@ public final class PtyTerminalFragment extends Fragment
 
   @Override
   public boolean onKeyDown(int keyCode, KeyEvent e, TerminalSession s) {
+    // 退格、方向键等按键事件不走 onCodePoint：先把攒着的文字写出去，保证顺序不乱。
+    flushInput();
     return !inputAllowed();
   }
 
@@ -617,7 +621,63 @@ public final class PtyTerminalFragment extends Fragment
 
   @Override
   public boolean onCodePoint(int codePoint, boolean ctrlDownFromKeyboard, TerminalSession s) {
-    return !inputAllowed();
+    if (!inputAllowed()) return true;
+    if (replayingInput) return false;
+    // 输入法一次提交的整串文字会在同一次消息里逐字回调到这里：先攒起来，消息结束时
+    // 再决定是整体粘贴（含换行）还是按原逻辑逐字输入。
+    if (pendingInput.isEmpty()) main.post(flushInput);
+    pendingInput.add(new int[] {codePoint, ctrlDownFromKeyboard ? 1 : 0});
+    return true;
+  }
+
+  /**
+   * 还原输入法原本提交的字符。Termux 收到文本里的控制字符会改写成“Ctrl+字母”再回调：
+   * 换行 \n 变成 Ctrl+m，制表符变成 Ctrl+i。只认 '\n' 会漏掉所有多行粘贴。
+   */
+  static int typedChar(int[] item) {
+    int c = item[0];
+    if (item[1] != 1) return c == '\r' ? '\n' : c;
+    if (c == 'm' || c == 'j') return '\n';
+    if (c >= 'a' && c <= 'z') return c - 96;
+    switch (c) {
+      case '_': return 31;
+      case '^': return 30;
+      case ']': return 29;
+      case '\\': return 28;
+      default: return c;
+    }
+  }
+
+  private final java.util.List<int[]> pendingInput = new java.util.ArrayList<>();
+  private boolean replayingInput;
+  private final Runnable flushInput = this::flushInput;
+
+  /**
+   * 多字且含换行（输入法里粘贴的多行命令）→ 括号粘贴，整体进入输入行；
+   * 否则交回 Termux 逐字处理，普通打字、Ctrl 组合键行为不变。
+   * ponytail: 重放时拿不到物理键盘的左 Alt 标记，外接键盘 Alt+字符会退化成普通字符。
+   */
+  private void flushInput() {
+    main.removeCallbacks(flushInput);
+    if (pendingInput.isEmpty()) return;
+    java.util.List<int[]> batch = new java.util.ArrayList<>(pendingInput);
+    pendingInput.clear();
+    boolean multiLine = false;
+    if (batch.size() > 1) for (int[] item : batch) multiLine |= typedChar(item) == '\n';
+    if (multiLine) {
+      StringBuilder text = new StringBuilder();
+      for (int[] item : batch) text.appendCodePoint(typedChar(item));
+      pasteText(text.toString());
+      return;
+    }
+    TerminalView target = view;
+    if (target == null) return;
+    replayingInput = true;
+    try {
+      for (int[] item : batch) target.inputCodePoint(item[0], item[1] == 1, false);
+    } finally {
+      replayingInput = false;
+    }
   }
 
   @Override

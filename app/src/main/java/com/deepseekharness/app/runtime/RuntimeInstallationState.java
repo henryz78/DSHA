@@ -68,6 +68,47 @@ final class RuntimeInstallationState {
    * 身份不一致先进入维护；同基础环境局部更新，基础环境变化才备份并重建。
    */
   public boolean rootfsVersionMatches() {
+    // 终端每输入一个字符、启动页每秒刷新都会走到这里。原实现每次解析约 200KB JSON，
+    // 输入法一次提交整串文字时会在主线程累积成数秒卡顿、ANR 和输入被截断。
+    // 描述文件与健康记录的大小、修改时间不变时，结果不会变，直接复用上次结论。
+    String key = versionMatchKey();
+    synchronized (this) {
+      if (key.equals(cachedVersionKey)) return cachedVersionMatches;
+    }
+    boolean matches = computeRootfsVersionMatches();
+    synchronized (this) {
+      cachedVersionKey = key;
+      cachedVersionMatches = matches;
+    }
+    return matches;
+  }
+
+  private String cachedVersionKey;
+  private boolean cachedVersionMatches;
+
+  /** 只做 stat，不读内容；任一文件出现、消失或被改写都会得到不同的键。 */
+  String versionMatchKey() {
+    File files = ctx.getFilesDir();
+    File descriptor = new File(files, "linux/.runtime-descriptor.json");
+    File health = new File(files, "runtime-health");
+    StringBuilder key =
+        new StringBuilder()
+            .append(descriptor.length())
+            .append(':')
+            .append(descriptor.lastModified())
+            .append(':')
+            .append(health.lastModified());
+    String[] records = health.list();
+    if (records != null)
+      for (String name : records) {
+        File record = new File(health, name);
+        key.append('|').append(name).append(':').append(record.length()).append(':')
+            .append(record.lastModified());
+      }
+    return key.toString();
+  }
+
+  private boolean computeRootfsVersionMatches() {
     try {
       com.deepseekharness.app.backup.RuntimeDescriptor installed = installedRuntimeDescriptor();
       return installed != null

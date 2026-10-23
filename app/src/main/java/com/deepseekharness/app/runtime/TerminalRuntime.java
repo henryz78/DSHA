@@ -58,6 +58,9 @@ final class TerminalRuntime {
     launcher.environment(probe, spec);
     probe.environment().put("LANG", "C.UTF-8");
     probe.environment().put("LC_ALL", "C.UTF-8");
+    // App 进程环境里没有 TERM，bash 会当成 dumb 终端：长行改成横向滚动（行首出现 '<'，
+    // 看上去像粘贴的命令被截断），vim/htop 等全屏程序也画不对。Termux 模拟器就是 xterm-256color。
+    probe.environment().put("TERM", "xterm-256color");
     List<String> environment = new ArrayList<>(probe.environment().size());
     probe
         .environment()

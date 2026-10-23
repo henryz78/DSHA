@@ -144,6 +144,17 @@ public final class PtySession implements TerminalSessionClient {
     if (t != null && s != null && !s.isEmpty()) t.write(s);
   }
 
+  /**
+   * 按终端粘贴语义写入：换行统一为回车，shell 开启括号粘贴时整体包裹，
+   * 多行内容作为一块进入输入行，不会逐行立即执行。
+   */
+  public void paste(String s) {
+    TerminalSession t = session;
+    if (t == null || s == null || s.isEmpty()) return;
+    if (t.getEmulator() != null) t.getEmulator().paste(s);
+    else t.write(s);
+  }
+
   public void resize(int cols, int rows) {
     TerminalSession t = session;
     if (t != null) t.updateSize(Math.max(4, cols), Math.max(2, rows));
