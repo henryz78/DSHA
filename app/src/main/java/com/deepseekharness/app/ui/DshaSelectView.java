@@ -66,7 +66,7 @@ public final class DshaSelectView extends AppCompatSpinner {
       item.setText(String.valueOf(getAdapter().getItem(i)));
       androidx.core.view.ViewCompat.setStateDescription(
           item, selected ? UiText.choose("已选择", "Selected") : null);
-      item.setTextSize(14);
+      item.setTextSize(16);
       item.setGravity(Gravity.CENTER_VERTICAL);
       item.setPadding(dp(16), dp(14), dp(16), dp(14));
       item.setMinHeight(dp(52));

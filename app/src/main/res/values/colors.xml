@@ -8,11 +8,14 @@
     <color name="accent_on">#FFFFFF</color>
     <color name="surface">#F7F7F7</color>
     <color name="card">#FFFFFF</color>
+    <!-- miuix 次要按钮底色 -->
+    <color name="secondary_button">#F0F0F0</color>
+    <color name="switch_track_off">#E6E6E6</color>
     <color name="raised">#EDF0F5</color>
-    <color name="line">#DFE4ED</color>
-    <color name="text">#152033</color>
-    <color name="text_secondary">#5C6A80</color>
-    <color name="text_muted">#5B6578</color>
+    <color name="line">#E0E0E0</color>
+    <color name="text">#000000</color>
+    <color name="text_secondary">#99000000</color>
+    <color name="text_muted">#8C93B0</color>
     <color name="ok">#207348</color>
     <color name="warn">#825900</color>
     <color name="err">#AD3D45</color>

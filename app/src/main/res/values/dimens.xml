@@ -52,11 +52,11 @@
 
     <!-- 大容器：卡片、预览框 -->
 
-    <dimen name="radius_card">18dp</dimen>
+    <dimen name="radius_card">16dp</dimen>
 
     <!-- 控件：按钮、输入框 -->
 
-    <dimen name="radius_control">13dp</dimen>
+    <dimen name="radius_control">16dp</dimen>
 
     <!-- 小控件：标签、tab、小徽章 -->
 
@@ -80,11 +80,11 @@
 
     <dimen name="text_title">17sp</dimen>
 
-    <dimen name="text_body">15sp</dimen>
+    <dimen name="text_body">16sp</dimen>
 
-    <dimen name="text_label">13sp</dimen>
+    <dimen name="text_label">14sp</dimen>
 
-    <dimen name="text_caption">12sp</dimen>
+    <dimen name="text_caption">13sp</dimen>
 
 
 

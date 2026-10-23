@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 次级按钮：描边浅底 + 按压涟漪 + 禁用变灰。
+<!-- 次级按钮：miuix 灰色实底 + 按压涟漪 + 禁用变灰。
      旧版是静态 shape：按下去毫无反馈，禁用后外观照旧（用户一直点一直没反应）。 -->
 <ripple xmlns:android="http://schemas.android.com/apk/res/android"
     android:color="@color/ripple">
@@ -21,11 +21,8 @@
             </item>
             <item>
                 <shape android:shape="rectangle">
-                    <solid android:color="@color/card" />
+                    <solid android:color="@color/secondary_button" />
                     <corners android:radius="@dimen/radius_control" />
-                    <stroke
-                        android:width="@dimen/stroke"
-                        android:color="@color/line" />
                 </shape>
             </item>
         </selector>

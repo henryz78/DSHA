@@ -19,19 +19,21 @@ final class CardPage {
     scroll = new ScrollView(context);
     scroll.setFillViewport(true);
     content = column();
-    content.setPadding(dp(18), dp(16), dp(18), dp(24));
+    content.setPadding(dp(12), dp(12), dp(12), dp(24));
     scroll.addView(content);
     root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-    TextView heading = text(title, 24, R.color.text);
+    TextView heading = text(title, 26, R.color.text);
     heading.setTypeface(null, android.graphics.Typeface.BOLD);
+    heading.setPadding(dp(16), dp(8), dp(16), dp(subtitle.isEmpty() ? 16 : 0));
     content.addView(heading);
     if (!subtitle.isEmpty()) {
-      TextView sub = text(subtitle, 12, R.color.text_secondary);
-      sub.setPadding(0, dp(7), 0, dp(18));
+      TextView sub = text(subtitle, 14, R.color.text_secondary);
+      sub.setPadding(dp(16), dp(8), dp(16), dp(16));
+      sub.setLineSpacing(dp(2), 1f);
       content.addView(sub);
     }
     footer = column();
-    footer.setPadding(dp(18), dp(8), dp(18), dp(12));
+    footer.setPadding(dp(12), dp(8), dp(12), dp(12));
     root.addView(footer);
   }
 
@@ -57,25 +59,25 @@ final class CardPage {
   LinearLayout card() {
     LinearLayout card = column();
     card.setBackgroundResource(R.drawable.bg_card);
-    card.setPadding(dp(16), dp(14), dp(16), dp(14));
+    card.setPadding(dp(16), dp(4), dp(16), dp(4));
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.bottomMargin = dp(14);
+    p.bottomMargin = dp(12);
     content.addView(card, p);
     return card;
   }
 
   void label(String title) {
-    TextView label = text(title, 11, R.color.text_muted);
-    label.setPadding(0, dp(6), 0, dp(8));
+    TextView label = text(title, 14, R.color.text_muted);
+    label.setPadding(dp(16), dp(12), dp(16), dp(8));
     content.addView(label);
   }
 
   void kv(LinearLayout card, String label, String value) {
     LinearLayout row = new LinearLayout(context);
     row.setGravity(Gravity.CENTER_VERTICAL);
-    row.setMinimumHeight(dp(38));
-    row.addView(text(label, 12, R.color.text_secondary), new LinearLayout.LayoutParams(0, -2, 1));
-    TextView content = text(value, 12, R.color.text);
+    row.setMinimumHeight(dp(56));
+    row.addView(text(label, 16, R.color.text), new LinearLayout.LayoutParams(0, -2, 1));
+    TextView content = text(value, 14, R.color.text_secondary);
     content.setMaxWidth(dp(210));
     content.setGravity(Gravity.END);
     row.addView(content);
@@ -85,7 +87,7 @@ final class CardPage {
   void entry(LinearLayout card, String title, String subtitle, int icon, Runnable action) {
     LinearLayout row = new LinearLayout(context);
     row.setGravity(Gravity.CENTER_VERTICAL);
-    row.setPadding(0, dp(10), 0, dp(10));
+    row.setPadding(0, dp(14), 0, dp(14));
     row.setMinimumHeight(dp(64));
     row.setBackgroundResource(R.drawable.bg_action_plain);
     row.setFocusable(true);
@@ -94,21 +96,20 @@ final class CardPage {
     mark.setImageResource(icon);
     mark.setImageTintList(
         android.content.res.ColorStateList.valueOf(context.getColor(R.color.primary)));
-    mark.setBackgroundResource(R.drawable.bg_logo);
-    mark.setPadding(dp(7), dp(7), dp(7), dp(7));
-    row.addView(mark, new LinearLayout.LayoutParams(dp(32), dp(32)));
+    row.addView(mark, new LinearLayout.LayoutParams(dp(24), dp(24)));
     LinearLayout words = column();
-    TextView heading = text(title, 13, R.color.text);
-    heading.setTypeface(null, android.graphics.Typeface.BOLD);
+    TextView heading = text(title, 16, R.color.text);
     words.addView(heading);
-    TextView detail = text(subtitle, 11, R.color.text_secondary);
-    detail.setPadding(0, dp(5), 0, 0);
+    TextView detail = text(subtitle, 14, R.color.text_secondary);
+    detail.setPadding(0, dp(4), 0, 0);
     words.addView(detail);
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(0, -2, 1);
-    p.leftMargin = dp(12);
+    p.leftMargin = dp(16);
     row.addView(words, p);
     ImageView arrow = new ImageView(context);
     arrow.setImageResource(R.drawable.ic_ui2_chevron);
+    arrow.setImageTintList(
+        android.content.res.ColorStateList.valueOf(context.getColor(R.color.text_muted)));
     row.addView(arrow, new LinearLayout.LayoutParams(dp(16), dp(16)));
     card.addView(row);
   }
@@ -116,15 +117,16 @@ final class CardPage {
   Button button(LinearLayout parent, String title, boolean primary, Runnable action) {
     var button = new androidx.appcompat.widget.AppCompatButton(context);
     button.setText(title);
-    button.setTextSize(13);
+    button.setTextSize(16);
     button.setAllCaps(false);
-    button.setMinHeight(dp(48));
+    button.setStateListAnimator(null);
+    button.setMinHeight(dp(52));
     button.setBackgroundResource(primary ? R.drawable.bg_btn_primary : R.drawable.bg_btn);
     button.setTextColor(
         context.getColorStateList(primary ? R.color.button_primary_text : R.color.button_text));
     button.setOnClickListener(v -> action.run());
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.topMargin = dp(8);
+    p.topMargin = dp(12);
     parent.addView(button, p);
     return button;
   }
