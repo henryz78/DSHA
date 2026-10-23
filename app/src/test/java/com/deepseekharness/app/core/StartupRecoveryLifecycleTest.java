@@ -136,23 +136,8 @@ public final class StartupRecoveryLifecycleTest {
   private TextView progress;
   private Runnable refresh;
 
-  public static final class SelectedNavigation
-      extends com.google.android.material.bottomnavigation.BottomNavigationView {
-    int selected;
-
-    public SelectedNavigation(Context context) {
-      super(context);
-    }
-
-    @Override
-    public int getSelectedItemId() {
-      return selected;
-    }
-  }
-
   public static final class NativeMain extends MainActivity {
     TextView banner;
-    SelectedNavigation navigation;
     androidx.lifecycle.LifecycleRegistry visibleLifecycle;
     final java.util.List<android.content.Intent> starts = new java.util.ArrayList<>();
 
@@ -164,10 +149,13 @@ public final class StartupRecoveryLifecycleTest {
     @Override
     @SuppressWarnings("unchecked")
     public <T extends android.view.View> T findViewById(int id) {
-      return (T)
-          (id == R.id.environment_recovery_banner
-              ? banner
-              : id == R.id.bottom_nav ? navigation : null);
+      return (T) (id == R.id.environment_recovery_banner ? banner : null);
+    }
+
+    void selectTabForTest(int id) throws Exception {
+      var field = MainActivity.class.getDeclaredField("selectedTab");
+      field.setAccessible(true);
+      field.setInt(this, id);
     }
 
     @Override
@@ -345,27 +333,18 @@ public final class StartupRecoveryLifecycleTest {
     running.setBoolean(null, true);
     var main = Robolectric.buildActivity(NativeMain.class).get();
     main.banner = new TextView(RuntimeEnvironment.getApplication());
-    // Only getSelectedItemId is used; avoid inflating unrelated Material resources in NoApkRunner.
-    Class<?> unsafeType = Class.forName("sun.misc.Unsafe");
-    var unsafeField = unsafeType.getDeclaredField("theUnsafe");
-    unsafeField.setAccessible(true);
-    main.navigation =
-        (SelectedNavigation)
-            unsafeType
-                .getMethod("allocateInstance", Class.class)
-                .invoke(unsafeField.get(null), SelectedNavigation.class);
     main.visibleLifecycle = new androidx.lifecycle.LifecycleRegistry(main);
     main.visibleLifecycle.setCurrentState(androidx.lifecycle.Lifecycle.State.RESUMED);
     Runnable poll = (Runnable) field(main, "refreshRecovery");
     Controller.config.requestStartupRecovery(true);
     try {
       for (int destination : new int[] {R.id.nav_plugins, R.id.nav_settings, R.id.nav_terminal}) {
-        main.navigation.selected = destination;
+        main.selectTabForTest(destination);
         poll.run();
         assertEquals("An explicit native destination must stay in front", 0, main.starts.size());
         assertEquals(android.view.View.VISIBLE, main.banner.getVisibility());
       }
-      main.navigation.selected = R.id.nav_launch;
+      main.selectTabForTest(R.id.nav_launch);
       try (var query = EnvironmentTaskGate.tryAcquire("插件操作")) {
         poll.run();
         assertEquals(0, main.starts.size());

@@ -12,7 +12,6 @@ import androidx.fragment.app.Fragment;
 import com.deepseekharness.app.R;
 import com.deepseekharness.app.core.ConfigStore;
 import com.deepseekharness.app.core.HarnessController;
-import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 /**
  * 主界面外壳：启动门禁 + 底部导航（启动 / 插件 / 设置 / 终端）+ 顶栏标题 + 关于入口。
@@ -46,6 +45,11 @@ public class MainActivity extends AppCompatActivity {
    * 否则会残留下来，让用户之后手动点启动页时被意外带进 Web。
    */
   private boolean pendingOpenWeb;
+
+  /** miuix 顶栏与底部标签；主界面就绪前为 null。 */
+  private MainChrome chrome;
+
+  private int selectedTab = R.id.nav_launch;
 
   private String openedRecovery = "";
   private final androidx.activity.result.ActivityResultLauncher<String> localNetworkPermission =
@@ -221,10 +225,6 @@ public class MainActivity extends AppCompatActivity {
     if (entryOverlay != null && entryOverlay.getParent() instanceof android.view.ViewGroup parent)
       parent.removeView(entryOverlay);
     entryOverlay = null;
-    findViewById(R.id.btn_tasks)
-        .setContentDescription(
-            com.deepseekharness.app.util.UiText.choose("后台任务", "Background tasks"));
-    findViewById(R.id.btn_tasks).setOnClickListener(v -> BackgroundTasksActivity.open(this));
     TextView recovery = findViewById(R.id.environment_recovery_banner);
     recovery.setOnClickListener(
         v -> {
@@ -250,10 +250,12 @@ public class MainActivity extends AppCompatActivity {
       }
     }
 
-    TextView title = findViewById(R.id.app_title);
-    renderThemeButton();
-    findViewById(R.id.sub_back)
-        .setOnClickListener(v -> getOnBackPressedDispatcher().onBackPressed());
+    chrome = new MainChrome();
+    chrome.attachTopBar(
+        findViewById(R.id.app_bar),
+        () -> getOnBackPressedDispatcher().onBackPressed(),
+        () -> BackgroundTasksActivity.open(this));
+    chrome.attachBottomBar(findViewById(R.id.bottom_nav), this::selectTab);
     getSupportFragmentManager().addOnBackStackChangedListener(this::updateToolbar);
     getSupportFragmentManager()
         .registerFragmentLifecycleCallbacks(
@@ -265,77 +267,18 @@ public class MainActivity extends AppCompatActivity {
               }
             },
             false);
-    android.view.ViewGroup quickEntries = findViewById(R.id.btn_about);
-    quickEntries.setVisibility(android.view.View.VISIBLE);
-    quickEntries.setContentDescription(com.deepseekharness.app.util.UiText.text("关于 DSHA"));
-    ((android.widget.ImageView) quickEntries.getChildAt(0)).setImageResource(R.drawable.ic_about);
-    quickEntries.setOnClickListener(v -> AboutDialog.show(this));
-
-    BottomNavigationView nav = findViewById(R.id.bottom_nav);
-    nav.setOnItemSelectedListener(
-        item -> {
-          // 当前根页面再次点选时保留输入和滚动；从子页返回或外部打开插件仍执行导航。
-          if (nav.getSelectedItemId() == item.getItemId()
-              && getSupportFragmentManager().getBackStackEntryCount() == 0
-              && getSupportFragmentManager().findFragmentById(R.id.fragment_container) != null
-              && !(getSupportFragmentManager().findFragmentById(R.id.fragment_container)
-                  instanceof EnvironmentRecoveryFragment)
-              && !getIntent().getBooleanExtra("open_plugins", false)) return true;
-          if (!getSupportFragmentManager().isStateSaved())
-            getSupportFragmentManager()
-                .popBackStackImmediate(
-                    null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
-          Fragment f;
-          int id = item.getItemId();
-          if (id == R.id.nav_launch) {
-            f = new LaunchFragment();
-            if (pendingOpenWeb) {
-              pendingOpenWeb = false;
-              Bundle args = new Bundle();
-              args.putBoolean(LaunchFragment.ARG_OPEN_WEB, true);
-              f.setArguments(args);
-            }
-            title.setText(R.string.app_name);
-          } else if (id == R.id.nav_plugins) {
-            f =
-                com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
-                    ? new EnvironmentRecoveryFragment()
-                    : new PluginFragment();
-            if (getIntent().getBooleanExtra("open_plugins", false)) {
-              Bundle args = new Bundle();
-              args.putBoolean("show_installed", true);
-              f.setArguments(args);
-              getIntent().removeExtra("open_plugins");
-            }
-            title.setText(R.string.app_name);
-          } else if (id == R.id.nav_settings) {
-            f = new SettingsFragment();
-            title.setText(R.string.app_name);
-          } else {
-            // 终端：默认挂真 PTY 页（vim/htop/tmux 能跑），可在 PTY 页切回简易版
-            f =
-                com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
-                    ? new EnvironmentRecoveryFragment()
-                    : PtyTerminalFragment.preferred(this)
-                        ? new PtyTerminalFragment()
-                        : new TerminalFragment();
-            title.setText(R.string.app_name);
-          }
-          UiMotion.page(this, getSupportFragmentManager().beginTransaction())
-              .replace(R.id.fragment_container, f)
-              .commit();
-          return true;
-        });
-
-    // 通知点击进入：必须在 setSelectedItemId 之前登记 —— setSelectedItemId 会【同步】
-    // 触发监听器创建 LaunchFragment，那时再置标记已经晚了（参数带不进去）。
+    // 通知点击进入：必须在 selectTab 之前登记 —— selectTab 会同步创建 LaunchFragment，
+    // 那时再置标记已经晚了（参数带不进去）。
     consumeOpenWeb(getIntent());
     if (savedInstanceState == null || controller.hasUnresolvedWebSession()) {
-      nav.setSelectedItemId(
+      selectTab(
           !controller.hasUnresolvedWebSession()
                   && getIntent().getBooleanExtra("open_plugins", false)
               ? R.id.nav_plugins
               : R.id.nav_launch);
+    } else {
+      selectedTab = savedInstanceState.getInt("selected_tab", R.id.nav_launch);
+      chrome.setTab(selectedTab);
     }
     releaseGatedPages(!controller.hasUnresolvedWebSession());
     consumeTaskTarget(getIntent());
@@ -347,6 +290,58 @@ public class MainActivity extends AppCompatActivity {
     recoveryHandler.removeCallbacks(refreshRecovery);
     recoveryHandler.post(refreshRecovery);
     maybePromptExternalRestore();
+  }
+
+  /** 切换底部标签。原 BottomNavigationView 监听器的逻辑，原样搬过来。 */
+  private void selectTab(int id) {
+    if (chrome == null) return;
+    // 当前根页面再次点选时保留输入和滚动；从子页返回或外部打开插件仍执行导航。
+    if (selectedTab == id
+        && getSupportFragmentManager().getBackStackEntryCount() == 0
+        && getSupportFragmentManager().findFragmentById(R.id.fragment_container) != null
+        && !(getSupportFragmentManager().findFragmentById(R.id.fragment_container)
+            instanceof EnvironmentRecoveryFragment)
+        && !getIntent().getBooleanExtra("open_plugins", false)) return;
+    selectedTab = id;
+    chrome.setTab(id);
+    if (!getSupportFragmentManager().isStateSaved())
+      getSupportFragmentManager()
+          .popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+    HarnessController controller = HarnessController.get(this);
+    Fragment f;
+    if (id == R.id.nav_launch) {
+      f = new LaunchFragment();
+      if (pendingOpenWeb) {
+        pendingOpenWeb = false;
+        Bundle args = new Bundle();
+        args.putBoolean(LaunchFragment.ARG_OPEN_WEB, true);
+        f.setArguments(args);
+      }
+    } else if (id == R.id.nav_plugins) {
+      f =
+          com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
+              ? new EnvironmentRecoveryFragment()
+              : new PluginFragment();
+      if (getIntent().getBooleanExtra("open_plugins", false)) {
+        Bundle args = new Bundle();
+        args.putBoolean("show_installed", true);
+        f.setArguments(args);
+        getIntent().removeExtra("open_plugins");
+      }
+    } else if (id == R.id.nav_settings) {
+      f = new SettingsFragment();
+    } else {
+      // 终端：默认挂真 PTY 页（vim/htop/tmux 能跑），可在 PTY 页切回简易版
+      f =
+          com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
+              ? new EnvironmentRecoveryFragment()
+              : PtyTerminalFragment.preferred(this)
+                  ? new PtyTerminalFragment()
+                  : new TerminalFragment();
+    }
+    UiMotion.page(this, getSupportFragmentManager().beginTransaction())
+        .replace(R.id.fragment_container, f)
+        .commit();
   }
 
   private void releaseGatedPages(boolean allowed) {
@@ -445,12 +440,10 @@ public class MainActivity extends AppCompatActivity {
       beginEntryCheck();
       return;
     }
-    BottomNavigationView nav = findViewById(R.id.bottom_nav);
-    if (nav != null && intent.getBooleanExtra("open_plugins", false))
-      nav.setSelectedItemId(R.id.nav_plugins);
-    if (nav != null && intent.getBooleanExtra("open_launch", false)) {
+    if (intent.getBooleanExtra("open_plugins", false)) selectTab(R.id.nav_plugins);
+    if (intent.getBooleanExtra("open_launch", false)) {
       intent.removeExtra("open_launch");
-      nav.setSelectedItemId(R.id.nav_launch);
+      selectTab(R.id.nav_launch);
     }
     consumeOpenWeb(intent);
     consumeTaskTarget(intent);
@@ -465,62 +458,15 @@ public class MainActivity extends AppCompatActivity {
     return BrowserTasks.resumeBackground(this, true);
   }
 
-  private void renderThemeButton() {
-    TextView theme = findViewById(R.id.btn_theme);
-    String preference = ThemeController.preference(this);
-    boolean system = com.deepseekharness.app.util.UiThemePreference.SYSTEM.equals(preference);
-    boolean light = com.deepseekharness.app.util.UiThemePreference.LIGHT.equals(preference);
-    theme.setText("");
-    theme.setCompoundDrawablesWithIntrinsicBounds(
-        system ? R.drawable.ic_ui2_auto : light ? R.drawable.ic_ui2_sun : R.drawable.ic_ui2_moon,
-        0,
-        0,
-        0);
-    theme.setContentDescription(
-        com.deepseekharness.app.util.UiText.text(
-            system
-                ? "当前跟随系统，点击切换白天；长按跟随系统"
-                : light ? "当前白天模式，点击切换黑夜；长按跟随系统" : "当前黑夜模式，点击切换跟随系统；长按跟随系统"));
-    theme.setOnClickListener(
-        v -> {
-          ThemeController.cycle(this);
-          renderThemeButton();
-          showThemePreference();
-        });
-    theme.setOnLongClickListener(
-        v -> {
-          ThemeController.followSystem(this);
-          renderThemeButton();
-          showThemePreference();
-          return true;
-        });
-  }
-
-  private void showThemePreference() {
-    String preference = ThemeController.preference(this);
-    String message =
-        com.deepseekharness.app.util.UiThemePreference.SYSTEM.equals(preference)
-            ? "已跟随系统主题"
-            : com.deepseekharness.app.util.UiThemePreference.LIGHT.equals(preference)
-                ? "已切换白天模式"
-                : "已切换黑夜模式";
-    android.widget.Toast.makeText(
-            this,
-            com.deepseekharness.app.util.UiText.text(message),
-            android.widget.Toast.LENGTH_SHORT)
-        .show();
-  }
-
   private void consumeTaskTarget(Intent intent) {
-    BottomNavigationView nav = findViewById(R.id.bottom_nav);
-    if (nav == null) return;
+    if (chrome == null) return;
     if (intent.getBooleanExtra("open_terminal", false)) {
       intent.removeExtra("open_terminal");
-      nav.setSelectedItemId(R.id.nav_terminal);
+      selectTab(R.id.nav_terminal);
     }
     if (intent.getBooleanExtra("open_install", false)) {
       intent.removeExtra("open_install");
-      nav.setSelectedItemId(R.id.nav_settings);
+      selectTab(R.id.nav_settings);
       UiMotion.page(this, getSupportFragmentManager().beginTransaction())
           .replace(R.id.fragment_container, new InstallFragment())
           .addToBackStack("settings")
@@ -542,11 +488,10 @@ public class MainActivity extends AppCompatActivity {
   private void consumeOpenWeb(Intent intent) {
     if (intent == null || !intent.getBooleanExtra("open_web", false)) return;
     intent.removeExtra("open_web");
-    BottomNavigationView nav = findViewById(R.id.bottom_nav);
-    if (nav == null) return;
+    if (chrome == null) return;
     pendingOpenWeb = true;
-    if (nav.getSelectedItemId() != R.id.nav_launch) {
-      nav.setSelectedItemId(R.id.nav_launch);
+    if (selectedTab != R.id.nav_launch) {
+      selectTab(R.id.nav_launch);
       return;
     }
     // 已经停在启动页（通知点击时 App 可能就在启动页）：不会触发监听器，
@@ -560,29 +505,27 @@ public class MainActivity extends AppCompatActivity {
   }
 
   private void updateToolbar() {
-    TextView title = findViewById(R.id.app_title);
-    if (title == null) return;
+    if (chrome == null) return;
     Fragment shown = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
-    boolean nested = getSupportFragmentManager().getBackStackEntryCount() > 0;
-    findViewById(R.id.sub_back)
-        .setVisibility(nested ? android.view.View.VISIBLE : android.view.View.GONE);
-    findViewById(R.id.app_logo)
-        .setVisibility(nested ? android.view.View.GONE : android.view.View.VISIBLE);
-    if (shown instanceof AboutFragment)
-      title.setText(com.deepseekharness.app.util.UiText.choose("关于 DSHA", "About DSHA"));
+    chrome.setBack(getSupportFragmentManager().getBackStackEntryCount() > 0);
+    String title;
+    if (shown instanceof AboutFragment) title = com.deepseekharness.app.util.UiText.choose("关于", "About");
     else if (shown instanceof OverlayFragment)
-      title.setText(com.deepseekharness.app.util.UiText.choose("悬浮条", "Floating status"));
-    else if (shown instanceof ConfigFragment) title.setText(R.string.ui2_runtime_config);
+      title = com.deepseekharness.app.util.UiText.choose("悬浮条", "Floating bar");
+    else if (shown instanceof ConfigFragment)
+      title = com.deepseekharness.app.util.UiText.choose("高级运行选项", "Advanced options");
     else if (shown instanceof DeviceGrantsFragment)
-      title.setText(com.deepseekharness.app.util.UiText.text("设备能力授权"));
+      title = com.deepseekharness.app.util.UiText.choose("设备控制", "Device control");
     else if (shown instanceof WorkspaceFragment)
-      title.setText(com.deepseekharness.app.util.UiText.text("数据与备份"));
-    else if (shown instanceof InstallFragment) title.setText(R.string.ui2_environment_page);
-    else if (shown instanceof SettingsFragment) title.setText(R.string.app_name);
-    else if (shown instanceof PluginFragment) title.setText(R.string.app_name);
+      title = com.deepseekharness.app.util.UiText.choose("备份与恢复", "Backup & restore");
+    else if (shown instanceof InstallFragment)
+      title = com.deepseekharness.app.util.UiText.choose("环境状态与修复", "Status & repair");
+    else if (shown instanceof SettingsFragment) title = getString(R.string.ui_m0023);
+    else if (shown instanceof PluginFragment) title = getString(R.string.ui_m0016);
     else if (shown instanceof TerminalFragment || shown instanceof PtyTerminalFragment)
-      title.setText(R.string.app_name);
-    else title.setText(R.string.app_name);
+      title = getString(R.string.ui_m0021);
+    else title = getString(R.string.app_name);
+    chrome.setTitle(title);
   }
 
   @Override
@@ -806,7 +749,6 @@ public class MainActivity extends AppCompatActivity {
                         ? com.deepseekharness.app.util.UiText.choose(
                             "等待确认恢复备份", "Backup restore awaiting confirmation")
                         : com.deepseekharness.app.util.StartupText.render(task.kind))));
-          BottomNavigationView nav = findViewById(R.id.bottom_nav);
           String key =
               controller.startupDiagnostics().recordId()
                   + ":"
@@ -820,7 +762,7 @@ public class MainActivity extends AppCompatActivity {
               && !controller.isStarting()
               && !controller.isStopping()
               && startupRecoveryDestination(
-                  nav == null ? R.id.nav_launch : nav.getSelectedItemId(),
+                  selectedTab,
                   getSupportFragmentManager().findFragmentById(R.id.fragment_container))
               && !key.equals(openedRecovery)
               && getLifecycle()
@@ -836,6 +778,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onSaveInstanceState(Bundle state) {
     state.putString("opened_startup_recovery", openedRecovery);
+    state.putInt("selected_tab", selectedTab);
     super.onSaveInstanceState(state);
   }
 

@@ -3,4 +3,9 @@
     <item name="overlay_confirm_allow" type="id" />
     <item name="overlay_confirm_deny" type="id" />
     <item name="overlay_preview_button" type="id" />
+    <!-- 旧顶栏控件已由 MainChrome 取代；debug 审计代码仍引用这些 id，保留声明以便编译。 -->
+    <item name="app_title" type="id" />
+    <item name="app_logo" type="id" />
+    <item name="sub_back" type="id" />
+    <item name="btn_theme" type="id" />
 </resources>
