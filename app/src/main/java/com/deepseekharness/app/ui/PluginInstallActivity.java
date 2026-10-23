@@ -17,23 +17,29 @@ import com.deepseekharness.app.util.PluginSource;
 public final class PluginInstallActivity extends AppCompatActivity {
   private PluginRepository repository;
   private PluginInstallLink request;
-  private Button install;
-  private TextView status, details;
+  private HyLine install, status, details;
+  private Runnable installAction = () -> {};
 
   @Override
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
-    setContentView(R.layout.activity_plugin_install);
-    status = findViewById(R.id.link_install_status);
-    details = findViewById(R.id.link_install_details);
-    install = findViewById(R.id.link_install_confirm);
-    findViewById(R.id.link_install_close)
-        .setOnClickListener(
-            v -> {
-              if (repository != null) repository.discardPreview();
-              finish();
+    var model = new HyScreenModel(getString(R.string.ui_m0106));
+    var card = model.section("");
+    status = card.selectable("");
+    details = card.selectable("");
+    install = card.button(com.deepseekharness.app.util.UiText.text("解析链接"), true, () -> installAction.run());
+    model.button(com.deepseekharness.app.util.UiText.text("打开插件管理"), false, () -> openMain(true));
+    setContentView(HyScreenKt.hyScreen(this, model, true));
+    getOnBackPressedDispatcher()
+        .addCallback(
+            this,
+            new androidx.activity.OnBackPressedCallback(true) {
+              @Override
+              public void handleOnBackPressed() {
+                if (repository != null) repository.discardPreview();
+                finish();
+              }
             });
-    findViewById(R.id.link_install_manage).setOnClickListener(v -> openMain(true));
     try {
       request = PluginInstallLink.parse(getIntent().getDataString());
     } catch (IllegalArgumentException e) {
@@ -45,7 +51,7 @@ public final class PluginInstallActivity extends AppCompatActivity {
       status.setText(
           com.deepseekharness.app.util.UiText.format("请在插件管理中查看 %s 的安装和启用状态", request.builtin));
       install.setText(com.deepseekharness.app.util.UiText.text("打开插件管理"));
-      install.setOnClickListener(v -> openMain(true));
+      installAction = () -> openMain(true);
       return;
     }
     repository = PluginRepository.get(this);
@@ -59,8 +65,8 @@ public final class PluginInstallActivity extends AppCompatActivity {
               renderPreview();
             });
     repository.preview().observe(this, ignored -> renderPreview());
-    install.setOnClickListener(
-        v -> {
+    installAction =
+        () -> {
           if (!HarnessController.get(this).isEnvironmentReady()) {
             getSharedPreferences("dsha-install-link", 0)
                 .edit()
@@ -70,13 +76,13 @@ public final class PluginInstallActivity extends AppCompatActivity {
             finish();
           } else if (repository.preview().getValue() != null) repository.confirmPreview();
           else inspect();
-        });
+        };
     if (!HarnessController.get(this).isEnvironmentReady()) {
       status.setText(
           com.deepseekharness.app.util.UiText.choose(
-              "请先完成 DSHA 首次初始化，完成后会继续安装插件",
-              "Complete DSHA setup first; plugin installation will resume afterward"));
-      install.setText(com.deepseekharness.app.util.UiText.text("初始化 DSHA"));
+              "请先完成首次初始化，完成后会继续安装插件",
+              "Complete setup first; plugin installation will resume afterward"));
+      install.setText(com.deepseekharness.app.util.UiText.choose("开始初始化", "Start setup"));
     } else if (saved == null) inspect();
   }
 
@@ -108,7 +114,7 @@ public final class PluginInstallActivity extends AppCompatActivity {
       install.setText(
           HarnessController.get(this).isEnvironmentReady()
               ? com.deepseekharness.app.util.UiText.text("解析链接 / 重试")
-              : com.deepseekharness.app.util.UiText.text("初始化 DSHA"));
+              : com.deepseekharness.app.util.UiText.choose("开始初始化", "Start setup"));
     }
   }
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 切换底部标签：旧页保持不动垫在下面，等新页淡入盖住再移除；
+     两页同时变透明会露出底色，看起来像闪一下。 -->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="180"
+    android:fromAlpha="1"
+    android:toAlpha="1" />

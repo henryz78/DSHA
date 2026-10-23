@@ -24,7 +24,7 @@ import com.deepseekharness.app.util.UiText;
  *
  * <p>界面由 LaunchScreen（miuix）绘制；这里只维护 {@link LaunchState} 和处理操作。
  */
-public class LaunchFragment extends Fragment {
+public class LaunchFragment extends Fragment implements OwnTopBar {
 
   /** 通知点击进入时带上的参数：Web 就绪后自动打开会话。 */
   public static final String ARG_OPEN_WEB = "open_web";

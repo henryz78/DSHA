@@ -100,7 +100,6 @@ public final class LayoutPreviewActivity extends AppCompatActivity {
             0,
             () -> {},
             true);
-        page.pluginCard.setVisibility(View.VISIBLE);
         page.action(
             page.plugins,
             "example-plugin · " + com.deepseekharness.app.util.UiText.choose("卸载", "Remove"),
@@ -247,7 +246,6 @@ public final class LayoutPreviewActivity extends AppCompatActivity {
                 available ? 33554432L : 0L,
                 release,
                 ready ? new java.io.File(getCacheDir(), "layout-only.apk") : null);
-        UpdateUi.render(canvas, state, false);
       } catch (ReflectiveOperationException error) {
         throw new IllegalStateException(error);
       }

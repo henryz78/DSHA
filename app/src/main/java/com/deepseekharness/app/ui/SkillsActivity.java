@@ -65,9 +65,7 @@ public final class SkillsActivity extends AppCompatActivity {
   }
 
   private Model model;
-  private LinearLayout rows;
-  private TextView status, listStatus;
-  private Button importButton, refreshButton, cancelButton;
+  private final SkillsUi ui = new SkillsUi();
   private final ActivityResultLauncher<String[]> picker =
       registerForActivityResult(
           new ActivityResultContracts.OpenDocument(),
@@ -88,53 +86,42 @@ public final class SkillsActivity extends AppCompatActivity {
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
     model = new ViewModelProvider(this).get(Model.class);
-    ScrollView scroll = new ScrollView(this);
-    scroll.setFillViewport(true);
-    scroll.setBackgroundColor(getColor(R.color.surface));
-    LinearLayout body = new LinearLayout(this);
-    body.setOrientation(LinearLayout.VERTICAL);
-    int padding = dp(20);
-    body.setPadding(padding, padding, padding, padding);
-    scroll.addView(body);
-    setContentView(scroll);
-    button(body, t("返回", "Back"), this::finish);
-    TextView title = text(body, t("技能（Skills）", "Skills"), 22, R.color.text);
-    title.setTypeface(null, android.graphics.Typeface.BOLD);
-    text(
-        body,
-        t(
-            "从文件导入 SKILL.md，让 DSH 按需读取可复用的任务说明。无需 Root。",
-            "Import SKILL.md files so DSH can load reusable task instructions as needed. Root is not required."),
-        14,
-        R.color.text_secondary);
-    text(
-        body,
-        t(
-            "这里管理用户全局技能。导入仅复制 SKILL.md，正文中的命令不会自动执行；引用的脚本和资料需用文件入口另行放入同一技能目录。",
-            "This page manages global user skills. Import copies only SKILL.md and does not run commands in its body. Add referenced scripts and resources to the same skill folder through Files."),
-        14,
-        R.color.text_secondary);
-    text(body, UiText.raw(SkillImports.GUEST_ROOT), 13, R.color.text_secondary);
-    importButton =
-        button(
-            body, t("导入 SKILL.md", "Import SKILL.md"), () -> picker.launch(new String[] {"*/*"}));
-    refreshButton = button(body, t("刷新技能", "Refresh skills"), () -> start(null));
-    cancelButton = button(body, t("取消读取", "Cancel reading"), model::cancel);
-    status = text(body, "", 14, R.color.text);
-    status.setTextIsSelectable(true);
-    listStatus = text(body, "", 14, R.color.text_secondary);
-    rows = new LinearLayout(this);
-    rows.setOrientation(LinearLayout.VERTICAL);
-    body.addView(rows);
-    model.catalogue.observe(this, this::render);
-    model.result.observe(this, result -> status.setText(resultText(result)));
+    setContentView(
+        SkillsScreenKt.skillsPage(
+            this,
+            ui,
+            new SkillsActions() {
+              public void importSkill() {
+                picker.launch(new String[] {"*/*"});
+              }
+
+              public void refresh() {
+                start(null);
+              }
+
+              public void cancel() {
+                model.cancel();
+              }
+
+              public void open(SkillImports.Entry entry) {
+                show(entry);
+              }
+            }));
+    model.catalogue.observe(
+        this,
+        catalogue -> {
+          if (catalogue == null) return;
+          ui.setEntries(catalogue.entries);
+          ui.setUnreadable(catalogue.unreadable);
+          ui.setLoaded(true);
+        });
+    model.result.observe(this, result -> ui.setStatus(resultText(result)));
     model.busy.observe(
         this,
         busy -> {
           boolean active = Boolean.TRUE.equals(busy);
-          importButton.setEnabled(!active);
-          refreshButton.setEnabled(!active);
-          cancelButton.setEnabled(active && !model.committing);
+          ui.setBusy(active);
+          ui.setCancelEnabled(active && !model.committing);
         });
     if (model.catalogue.getValue() == null && !model.working.get()) start(null);
   }
@@ -153,45 +140,15 @@ public final class SkillsActivity extends AppCompatActivity {
     return text;
   }
 
-  private Button button(LinearLayout parent, String label, Runnable action) {
-    Button button = new Button(this);
+  private MiuixButton button(LinearLayout parent, String label, Runnable action) {
+    MiuixButton button = new MiuixButton(this);
     button.setText(label);
-    button.setAllCaps(false);
-    button.setIncludeFontPadding(false);
-    button.setGravity(Gravity.CENTER);
-    button.setMinHeight(dp(48));
-    button.setBackgroundResource(R.drawable.bg_btn);
-    button.setTextColor(getColor(R.color.text));
+    button.setPrimary(false);
     LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
     layout.topMargin = dp(8);
     parent.addView(button, layout);
     button.setOnClickListener(view -> action.run());
     return button;
-  }
-
-  private void render(SkillImports.Catalogue catalogue) {
-    rows.removeAllViews();
-    if (catalogue == null) return;
-    listStatus.setText(
-        catalogue.entries.isEmpty()
-            ? t("尚无可读取的用户全局技能。", "No readable global user skills yet.")
-            : f("可读取的用户全局技能：%s", "Readable global user skills: %s", catalogue.entries.size()));
-    if (catalogue.unreadable > 0)
-      text(
-          rows,
-          f(
-              "另有 %s 个技能文件无法通过导入格式检查，原件已保留。",
-              "%s additional skill files did not pass the import format checks. Their originals were retained.",
-              catalogue.unreadable),
-          14,
-          R.color.text_secondary);
-    for (SkillImports.Entry entry : catalogue.entries) {
-      TextView name = text(rows, UiText.raw(entry.document.name), 18, R.color.text);
-      name.setTypeface(null, android.graphics.Typeface.BOLD);
-      text(rows, UiText.raw(entry.document.description), 14, R.color.text_secondary);
-      text(rows, UiText.raw(entry.guestPath()), 12, R.color.text_secondary);
-      button(rows, t("查看 SKILL.md", "View SKILL.md"), () -> show(entry));
-    }
   }
 
   private void show(SkillImports.Entry entry) {

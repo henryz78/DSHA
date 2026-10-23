@@ -6,6 +6,16 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
+import com.deepseekharness.app.R
+import com.deepseekharness.app.util.UiText
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -69,7 +79,27 @@ fun bindTerminalHeader(
   tools: List<TerminalTool>,
   actions: TerminalChromeActions,
 ) {
-  view.setContent { HydshTheme { Header(header, tools, actions) } }
+  view.setContent {
+    HydshTheme {
+      Column {
+        // 终端页自带顶栏（和其他三个主页面一样），切换标签时主界面布局不用变，避免闪动。
+        SmallTopAppBar(
+          title = UiText.choose("终端", "Terminal"),
+          modifier = Modifier.consumeWindowInsets(WindowInsets.systemBars),
+          defaultWindowInsetsPadding = false,
+          actions = {
+            IconButton(onClick = { BackgroundTasksActivity.open(view.context) }) {
+              Icon(
+                ImageVector.vectorResource(R.drawable.ic_ui_tasks),
+                contentDescription = UiText.choose("后台任务", "Background tasks"),
+              )
+            }
+          },
+        )
+        Box(Modifier.padding(horizontal = 16.dp)) { Header(header, tools, actions) }
+      }
+    }
+  }
 }
 
 /** 扩展键：前 8 个一行、其余一行，每行等宽铺满。onKey 收到按键下标。 */

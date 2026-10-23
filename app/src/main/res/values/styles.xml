@@ -107,12 +107,24 @@
     <style name="Widget.DSHA.RadioButton" parent="Widget.Material3.CompoundButton.RadioButton">
         <item name="android:textColor">@color/button_text</item>
         <item name="android:textSize">16sp</item>
-        <item name="buttonTint">@color/compound_tint</item>
+        <item name="android:button">@drawable/miuix_check</item>
+        <item name="buttonCompat">@drawable/miuix_check</item>
+        <item name="buttonTint">@null</item>
+        <item name="android:buttonTint">@null</item>
+        <item name="useMaterialThemeColors">false</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:minHeight">48dp</item>
     </style>
     <style name="Widget.DSHA.CheckBox" parent="Widget.Material3.CompoundButton.CheckBox">
         <item name="android:textColor">@color/button_text</item>
         <item name="android:textSize">16sp</item>
-        <item name="buttonTint">@color/compound_tint</item>
+        <item name="android:button">@drawable/miuix_check</item>
+        <item name="buttonCompat">@drawable/miuix_check</item>
+        <item name="buttonTint">@null</item>
+        <item name="android:buttonTint">@null</item>
+        <item name="useMaterialThemeColors">false</item>
+        <item name="android:paddingStart">10dp</item>
+        <item name="android:minHeight">48dp</item>
     </style>
     <!-- miuix 开关：白色圆点、无描边、无图标，轨道颜色见 switch_track。 -->
     <style name="Widget.DSHA.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">

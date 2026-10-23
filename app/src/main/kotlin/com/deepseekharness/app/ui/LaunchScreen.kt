@@ -25,11 +25,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.deepseekharness.app.R
 import com.deepseekharness.app.ui.compose.HydshTheme
 import com.deepseekharness.app.util.UiText
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -92,16 +94,11 @@ fun bindLaunchScreen(view: ComposeView, state: LaunchState, actions: LaunchActio
 
 @Composable
 private fun LaunchScreen(state: LaunchState, actions: LaunchActions) {
-  Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
-    LazyColumn(
-      modifier = Modifier.fillMaxSize().overScrollVertical(),
-      contentPadding = PaddingValues(top = padding.calculateTopPadding() + 12.dp, bottom = 24.dp),
-    ) {
+  HyPage(title = stringResource(R.string.app_name), tasks = true) {
       item { StatusCard(state, actions) }
       item { InfoSection(state, actions) }
       item { TroubleSection(state, actions) }
       item { LogSection(state, actions) }
-    }
   }
 }
 

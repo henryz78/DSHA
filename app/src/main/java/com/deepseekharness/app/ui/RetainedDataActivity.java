@@ -37,8 +37,10 @@ public final class RetainedDataActivity extends AppCompatActivity {
   }
 
   private Model model;
-  private LinearLayout rows;
-  private TextView report, pageStatus;
+  private HyScreenModel screen;
+  private HyLine report, pageStatus;
+  /** 第一组之后的分组都是清单卡片，刷新时整体重建。 */
+  private int fixedGroups;
   private com.deepseekharness.app.core.PluginRepository plugins;
 
   private static String t(String zh, String en) {
@@ -55,35 +57,16 @@ public final class RetainedDataActivity extends AppCompatActivity {
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
     model = new ViewModelProvider(this).get(Model.class);
-    ScrollView scroll = new ScrollView(this);
-    scroll.setBackgroundColor(getColor(R.color.surface));
-    LinearLayout body = new LinearLayout(this);
-    body.setOrientation(LinearLayout.VERTICAL);
-    int p = (int) (20 * getResources().getDisplayMetrics().density);
-    body.setPadding(p, p, p, p);
-    scroll.addView(body);
-    setContentView(scroll);
     plugins = com.deepseekharness.app.core.PluginRepository.get(this);
-    button(body, t("返回", "Back"), this::finish);
-    TextView title = new TextView(this);
-    title.setText(t("保留副本与旧树", "Retained copies and old trees"));
-    title.setTextSize(22);
-    title.setTextColor(getColor(R.color.text));
-    title.setTypeface(null, android.graphics.Typeface.BOLD);
-    title.setPadding(0, p, 0, p / 2);
-    body.addView(title);
-    TextView note = new TextView(this);
-    note.setText(
+    screen = new HyScreenModel(t("保留副本与旧树", "Retained copies and old trees"));
+    screen.note(
         t(
             "原件保持只读。记录中的成功状态不是本次重新验证；检查、导出与恢复分别处理。未知或受损原件继续保留。",
             "Originals remain read-only. A recorded success is not a fresh verification. Inspect, export and restore are separate operations. Unknown or damaged originals remain retained."));
-    note.setTextSize(14);
-    note.setTextColor(getColor(R.color.text_secondary));
-    note.setPadding(0, 0, 0, p / 2);
-    body.addView(note);
-    button(
-        body,
+    var actions = screen.section("");
+    actions.button(
         t("刷新清单", "Refresh list"),
+        false,
         () -> {
           if (model.working.get()) return;
           model.page = 0;
@@ -91,21 +74,17 @@ public final class RetainedDataActivity extends AppCompatActivity {
           model.starts.add(null);
           refresh();
         });
-    button(body, t("检查所选记录", "Inspect selected records"), this::inspect);
-    button(
-        body,
+    actions.button(t("检查所选记录", "Inspect selected records"), true, this::inspect);
+    actions.button(
         t("取消检查", "Cancel inspection"),
+        false,
         () -> {
           if (model.control != null) model.control.cancel();
         });
-    report = new TextView(this);
-    body.addView(report);
-    pageStatus = new TextView(this);
-    pageStatus.setTextColor(getColor(R.color.text_secondary));
-    body.addView(pageStatus);
-    rows = new LinearLayout(this);
-    rows.setOrientation(LinearLayout.VERTICAL);
-    body.addView(rows);
+    report = actions.selectable("");
+    pageStatus = screen.note("");
+    fixedGroups = screen.getGroups().size();
+    setContentView(HyScreenKt.hyScreen(this, screen, true));
     model.report.observe(
         this,
         value -> {
@@ -129,20 +108,7 @@ public final class RetainedDataActivity extends AppCompatActivity {
             });
   }
 
-  private void button(LinearLayout parent, String label, Runnable action) {
-    Button button = new Button(this);
-    button.setText(label);
-    button.setAllCaps(false);
-    button.setIncludeFontPadding(false);
-    button.setGravity(android.view.Gravity.CENTER);
-    button.setMinHeight((int) (48 * getResources().getDisplayMetrics().density));
-    button.setBackgroundResource(R.drawable.bg_btn);
-    button.setTextColor(getColor(R.color.text));
-    LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
-    layout.topMargin = (int) (8 * getResources().getDisplayMetrics().density);
-    parent.addView(button, layout);
-    button.setOnClickListener(v -> action.run());
-  }
+
 
   private void refresh() {
     if (!model.working.compareAndSet(false, true)) return;
@@ -236,16 +202,15 @@ public final class RetainedDataActivity extends AppCompatActivity {
   }
 
   private void render(RetainedCatalogue.Page page) {
-    rows.removeAllViews();
+    var groups = screen.getGroups();
+    while (groups.size() > fixedGroups) groups.remove(groups.size() - 1);
     long first = (long) model.page * page.size, last = first + page.entries.size();
     pageStatus.setText(
         UiText.format(
             "已显示 %s–%s / %s 条 · 第 %s 页",
             page.total == 0 ? 0 : first + 1, last, page.total, model.page + 1));
     if (page.entries.isEmpty()) {
-      TextView empty = new TextView(this);
-      empty.setText(t("暂无保留副本。", "No retained copies."));
-      rows.addView(empty);
+      screen.section("").text(t("暂无保留副本。", "No retained copies."));
       return;
     }
     for (var entry : page.entries) {
@@ -253,50 +218,43 @@ public final class RetainedDataActivity extends AppCompatActivity {
         String owner = entry.kind.name() + ":" + entry.id + ":";
         model.selected.keySet().removeIf(key -> key.startsWith(owner));
       }
-      LinearLayout card = new LinearLayout(this);
-      card.setOrientation(LinearLayout.VERTICAL);
-      card.setBackgroundResource(R.drawable.bg_polished_card);
-      int pad = (int) (12 * getResources().getDisplayMetrics().density);
-      card.setPadding(pad, pad, pad, pad);
-      CheckBox selected = new CheckBox(this);
-      selected.setText(label(entry));
-      selected.setIncludeFontPadding(false);
-      selected.setTextSize(16);
-      selected.setMinHeight((int) (48 * getResources().getDisplayMetrics().density));
-      selected.setEnabled(!entry.status.equals("DUPLICATE"));
-      selected.setChecked(
-          !entry.status.equals("DUPLICATE") && model.selected.containsKey(entry.key()));
-      selected.setOnCheckedChangeListener(
-          (v, on) -> {
-            if (on) model.selected.put(entry.key(), entry);
-            else model.selected.remove(entry.key());
-          });
-      card.addView(selected);
-      button(card, t("查看与操作", "Details and actions"), () -> details(entry));
-      LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
-      layout.bottomMargin = pad;
-      rows.addView(card, layout);
+      var card = screen.section("");
+      HyLine[] selected = new HyLine[1];
+      selected[0] =
+          card.check(
+              label(entry),
+              !entry.status.equals("DUPLICATE") && model.selected.containsKey(entry.key()),
+              on -> {
+                if (on) model.selected.put(entry.key(), entry);
+                else model.selected.remove(entry.key());
+                selected[0].setChecked(on);
+              });
+      selected[0].setEnabled(!entry.status.equals("DUPLICATE"));
+      card.arrow(t("查看与操作", "Details and actions"), "", () -> details(entry));
     }
-    if (model.page > 0)
-      button(
-          rows,
-          t("上一页", "Previous page"),
-          () -> {
-            if (model.working.get()) return;
-            model.page--;
-            refresh();
-          });
-    if (page.hasNext())
-      button(
-          rows,
-          t("下一页", "Next page"),
-          () -> {
-            if (model.working.get()) return;
-            if (model.starts.size() > model.page + 1) model.starts.set(model.page + 1, page.next);
-            else model.starts.add(page.next);
-            model.page++;
-            refresh();
-          });
+    if (model.page > 0 || page.hasNext()) {
+      var pages = screen.section("");
+      if (model.page > 0)
+        pages.button(
+            t("上一页", "Previous page"),
+            false,
+            () -> {
+              if (model.working.get()) return;
+              model.page--;
+              refresh();
+            });
+      if (page.hasNext())
+        pages.button(
+            t("下一页", "Next page"),
+            false,
+            () -> {
+              if (model.working.get()) return;
+              if (model.starts.size() > model.page + 1) model.starts.set(model.page + 1, page.next);
+              else model.starts.add(page.next);
+              model.page++;
+              refresh();
+            });
+    }
   }
 
   private void details(RetainedCatalogue.Entry entry) {

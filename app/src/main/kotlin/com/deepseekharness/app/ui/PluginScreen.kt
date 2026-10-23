@@ -23,9 +23,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.deepseekharness.app.R
 import com.deepseekharness.app.ui.compose.HydshTheme
 import com.deepseekharness.app.util.UiText
 import kotlinx.coroutines.flow.drop
@@ -36,6 +38,7 @@ import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -136,22 +139,15 @@ private fun PluginScreen(state: PluginUiState, actions: PluginActions) {
   LaunchedEffect(state) {
     snapshotFlow { state.search() }.drop(1).collect { actions.filtersChanged() }
   }
-  Scaffold(contentWindowInsets = WindowInsets(0, 0, 0, 0)) { padding ->
-    LazyColumn(
-      modifier = Modifier.fillMaxSize().overScrollVertical(),
-      contentPadding = PaddingValues(top = padding.calculateTopPadding() + 12.dp, bottom = 24.dp),
-    ) {
+  HyPage(title = stringResource(R.string.ui_m0016), tasks = true) {
       item {
-        // 用原生按钮切换：当前页为主色按钮，另一页为普通按钮。
-        Row(modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp)) {
-          TabButton(t("安装插件", "Install"), state.market, Modifier.weight(1f)) {
-            actions.selectTab(true)
-          }
-          Spacer(Modifier.width(12.dp))
-          TabButton(t("已安装", "Installed"), !state.market, Modifier.weight(1f)) {
-            actions.selectTab(false)
-          }
-        }
+        // miuix 标签：安装插件 / 已安装。
+        TabRowWithContour(
+          tabs = listOf(t("安装插件", "Install"), t("已安装", "Installed")),
+          selectedTabIndex = if (state.market) 0 else 1,
+          onTabSelected = { actions.selectTab(it == 0) },
+          modifier = Modifier.padding(horizontal = 12.dp).padding(bottom = 12.dp),
+        )
       }
       item { StatusCard(state, actions) }
       if (state.market) {
@@ -170,19 +166,7 @@ private fun PluginScreen(state: PluginUiState, actions: PluginActions) {
           }
         items(state.rows, key = { it.name }) { row -> PluginItem(row, actions) }
       }
-    }
   }
-}
-
-@Composable
-private fun TabButton(text: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
-  TextButton(
-    text = text,
-    onClick = onClick,
-    modifier = modifier,
-    colors =
-      if (selected) ButtonDefaults.textButtonColorsPrimary() else ButtonDefaults.textButtonColors(),
-  )
 }
 
 @Composable

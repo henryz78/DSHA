@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- MiuixButton / MiuixSwitch 读取的 XML 属性。 -->
+    <declare-styleable name="MiuixButton">
+        <attr name="android:text" />
+        <attr name="android:enabled" />
+        <attr name="miuixPrimary" format="boolean" />
+    </declare-styleable>
+</resources>

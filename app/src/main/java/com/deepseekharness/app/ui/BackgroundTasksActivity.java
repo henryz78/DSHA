@@ -15,7 +15,7 @@ import com.deepseekharness.app.util.UiText;
 
 /** 任务观察页只读状态；取消操作仍交给原业务页面的安全提交边界。 */
 public final class BackgroundTasksActivity extends AppCompatActivity {
-  private TextView status;
+  private HyLine status;
   private final Handler handler = new Handler(Looper.getMainLooper());
   private final Runnable refresh =
       new Runnable() {
@@ -41,39 +41,29 @@ public final class BackgroundTasksActivity extends AppCompatActivity {
   @Override
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
-    CardPage page =
-        new CardPage(
-            this,
-            t("后台任务", "Background tasks"),
-            t(
-                "查看正在执行的操作和进度。需要取消时，请进入对应页面。",
-                "View active operations and progress. Open the related page to cancel safely."));
-    UiNavigation.addHeader(this, page.root, t("后台任务", "Background tasks"), this::finish);
-    page.content.removeViewAt(0);
-    status = page.text("", 13, R.color.text);
-    status.setTextIsSelectable(true);
-    page.card().addView(status);
-    var links = page.card();
-    page.button(
-        links,
+    var model = new HyScreenModel(t("后台任务", "Background tasks"));
+    model.note(
+        t(
+            "查看正在执行的操作和进度。需要取消时，请进入对应页面。",
+            "View active operations and progress. Open the related page to cancel safely."));
+    status = model.section("").selectable("");
+    var links = model.section(t("相关页面", "Related pages"));
+    links.arrow(
         t("Agent 任务", "Agent tasks"),
-        false,
+        "",
         () -> startActivity(new Intent(this, AgentTasksActivity.class)));
-    page.button(links, t("插件管理", "Plugin management"), false, () -> main("open_plugins"));
-    page.button(links, t("终端", "Terminals"), false, () -> main("open_terminal"));
-    page.button(
-        links,
+    links.arrow(t("插件管理", "Plugin management"), "", () -> main("open_plugins"));
+    links.arrow(t("终端", "Terminals"), "", () -> main("open_terminal"));
+    links.arrow(
         t("数据与备份", "Data and backups"),
-        false,
+        "",
         () -> startActivity(new Intent(this, NativeDataActivity.class)));
-    page.button(
-        links,
+    links.arrow(
         t("自动备份", "Automatic backups"),
-        false,
+        "",
         () -> startActivity(new Intent(this, AutomaticBackupActivity.class)));
-    page.button(
-        links, t("安装与环境", "Installation and environment"), false, () -> main("open_install"));
-    setContentView(page.root);
+    links.arrow(t("安装与环境", "Installation and environment"), "", () -> main("open_install"));
+    setContentView(HyScreenKt.hyScreen(this, model, true));
     render();
   }
 
@@ -115,7 +105,7 @@ public final class BackgroundTasksActivity extends AppCompatActivity {
     if (text.length() == 0)
       text.append(t("当前没有原生后台任务。", "No native background tasks are running."));
     String value = text.toString().trim();
-    if (!value.contentEquals(status.getText())) status.setText(value);
+    if (!value.equals(status.getText())) status.setText(value);
   }
 
   @Override

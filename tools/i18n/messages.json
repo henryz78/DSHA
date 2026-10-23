@@ -24026,8 +24026,8 @@
   },
   {
     "id": "ui2_meet",
-    "zh": "认识 DSHA",
-    "en": "Discover DSHA",
+    "zh": "认识 HYDSH",
+    "en": "Discover HYDSH",
     "files": [
       "app/src/main/res/values/ui_iteration.xml"
     ]

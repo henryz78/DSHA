@@ -24,7 +24,7 @@ import com.deepseekharness.app.util.TerminalSession;
 import java.io.IOException;
 
 /** 简易终端页面；持久 shell 的发送、退出和取消由无视图引用的 TerminalSession 负责。 */
-public class TerminalFragment extends Fragment {
+public class TerminalFragment extends Fragment implements OwnTopBar {
   private static final String HEADER = "Ubuntu 24.04 · 回车执行 · 中止会重启 shell · 交互输入请用 PTY\n";
   private static final Handler MAIN = new Handler(Looper.getMainLooper());
   private static final TerminalSessionOwner OWNER = TerminalSessionOwner.shared();
@@ -75,6 +75,7 @@ public class TerminalFragment extends Fragment {
 
   @Override
   public void onViewCreated(@NonNull View view, @Nullable Bundle state) {
+    GlassBar.padTerminal(view);
     inputEdit = view.findViewById(R.id.term_input);
     outputText = view.findViewById(R.id.term_output);
     scrollView = view.findViewById(R.id.term_scroll);
@@ -128,8 +129,8 @@ public class TerminalFragment extends Fragment {
           }
           return false;
         });
-    if (!OWNER.simpleTabs().wasInitialized()) newTerminal();
-    else attachSelected();
+    // 第一个会话等页面真正显示（onResume）时再开，理由同 PTY 页。
+    if (OWNER.simpleTabs().wasInitialized()) attachSelected();
   }
 
   private void newTerminal() {
@@ -288,8 +289,13 @@ public class TerminalFragment extends Fragment {
         .putBoolean("term_pty", true)
         .apply();
     try {
+      // 主界面里由翻页器换页（偏好已经写好）。
+      if (getActivity() instanceof MainActivity main) {
+        main.refreshTabs();
+        return;
+      }
       int containerId = ((ViewGroup) requireView().getParent()).getId();
-      UiMotion.page(requireContext(), getParentFragmentManager().beginTransaction())
+      UiMotion.tab(requireContext(), getParentFragmentManager().beginTransaction())
           .replace(containerId, new PtyTerminalFragment())
           .commit();
     } catch (RuntimeException error) {
@@ -326,7 +332,10 @@ public class TerminalFragment extends Fragment {
   public void onResume() {
     super.onResume();
     OWNER.attachSimple(observer);
-    if (inputEdit != null) attachSelected();
+    if (inputEdit != null) {
+      if (!OWNER.simpleTabs().wasInitialized()) newTerminal();
+      else attachSelected();
+    }
   }
 
   @Override

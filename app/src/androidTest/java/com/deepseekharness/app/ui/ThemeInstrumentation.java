@@ -340,7 +340,7 @@ public final class ThemeInstrumentation extends Instrumentation {
                   new Intent(getTargetContext(), UpdateActivity.class)
                       .setAction("theme.update." + System.nanoTime())
                       .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-          until(() -> page.findViewById(R.id.update_back).getWidth() > 0, "更新页未布局");
+          until(() -> page.findViewById(R.id.page_bar).getWidth() > 0, "更新页未布局");
           runOnMainSync(
               () ->
                   audit(

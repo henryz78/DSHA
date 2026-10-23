@@ -8,9 +8,9 @@ import com.deepseekharness.app.util.UiText;
 
 /** 用户可复现的全流程计时；只在独立空目录安装，保留当前环境与数据。 */
 public final class ColdSetupSpeedActivity extends androidx.appcompat.app.AppCompatActivity {
-  private TextView status;
-  private Button start;
-  private Button back;
+  private HyLine status;
+  private HyLine start;
+  private HyLine back;
   private Thread worker;
   private boolean running;
 
@@ -27,28 +27,23 @@ public final class ColdSetupSpeedActivity extends androidx.appcompat.app.AppComp
                 else cancel();
               }
             });
-    CardPage page =
-        new CardPage(
-            this,
-            UiText.choose("首次安装测速", "First-install timing"),
-            UiText.choose(
-                "在独立目录完整执行首次安装，保留当前环境、数据和设置。开始时会正常停止 DSH 和终端；测速期间请保持应用在前台。",
-                "Run a complete first install in an isolated directory while keeping the existing environment, data and settings. DSH and terminals stop normally before timing. Keep the app in the foreground."));
-    setContentView(page.root);
+    var page = new HyScreenModel(UiText.choose("首次安装测速", "First-install timing"));
+    page.note(
+        UiText.choose(
+            "在独立目录完整执行首次安装，保留当前环境、数据和设置。开始时会正常停止 DSH 和终端；测速期间请保持应用在前台。",
+            "Run a complete first install in an isolated directory while keeping the existing environment, data and settings. DSH and terminals stop normally before timing. Keep the app in the foreground."));
     status =
-        page.text(
-            com.deepseekharness.app.core.ColdSetupTiming.report(this, false), 14, R.color.text);
-    page.content.addView(status);
-    start = page.button(page.footer, UiText.choose("开始测速", "Start timing"), true, this::run);
+        page.section("").selectable(com.deepseekharness.app.core.ColdSetupTiming.report(this, false));
+    start = page.button(UiText.choose("开始测速", "Start timing"), true, this::run);
     back =
         page.button(
-            page.footer,
             UiText.text("返回"),
             false,
             () -> {
               if (!running) finish();
               else cancel();
             });
+    setContentView(HyScreenKt.hyScreen(this, page, true));
   }
 
   private void run() {

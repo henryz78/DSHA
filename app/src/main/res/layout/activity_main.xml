@@ -1,8 +1,16 @@
 <?xml version='1.0' encoding='utf-8'?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/surface" android:orientation="vertical">
-  <!-- 顶栏与底部标签由 MainChrome（miuix）绘制。 -->
-  <androidx.compose.ui.platform.ComposeView android:id="@+id/app_bar" android:layout_width="match_parent" android:layout_height="wrap_content" />
-  <TextView android:id="@+id/environment_recovery_banner" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:textColor="@color/primary" android:background="@drawable/bg_chip_clickable" android:textSize="14sp" android:clickable="true" android:focusable="true" android:visibility="gone" android:gravity="center" android:includeFontPadding="false" />
-  <FrameLayout android:id="@+id/fragment_container" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
-  <androidx.compose.ui.platform.ComposeView android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content" />
-</LinearLayout>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/surface">
+  <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
+    <!-- 顶栏与底部标签由 MainChrome（miuix）绘制。 -->
+    <androidx.compose.ui.platform.ComposeView android:id="@+id/app_bar" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    <TextView android:id="@+id/environment_recovery_banner" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:padding="12dp" android:textColor="@color/primary" android:background="@drawable/bg_chip_clickable" android:textSize="14sp" android:clickable="true" android:focusable="true" android:visibility="gone" android:gravity="center" android:includeFontPadding="false" />
+    <!-- 底部留白由 MainActivity 按底栏高度设置；玻璃底栏时页面铺到底栏后面。 -->
+    <com.deepseekharness.app.ui.BackdropSourceLayout android:id="@+id/content_frame" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+      <!-- 四个主标签页（左右平移切换）。 -->
+      <androidx.viewpager2.widget.ViewPager2 android:id="@+id/main_pager" android:layout_width="match_parent" android:layout_height="match_parent" />
+      <!-- 子页面叠在标签页上面，带返回栈；没有子页面时为空，不挡触摸。 -->
+      <androidx.fragment.app.FragmentContainerView android:id="@+id/fragment_container" android:layout_width="match_parent" android:layout_height="match_parent" />
+    </com.deepseekharness.app.ui.BackdropSourceLayout>
+  </LinearLayout>
+  <androidx.compose.ui.platform.ComposeView android:id="@+id/bottom_nav" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_gravity="bottom" />
+</FrameLayout>

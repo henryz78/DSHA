@@ -34,7 +34,7 @@ import java.util.Locale;
  *
  * <p>界面由 PluginScreen（miuix）绘制；这里只维护 {@link PluginUiState} 和处理操作。
  */
-public class PluginFragment extends Fragment {
+public class PluginFragment extends Fragment implements OwnTopBar {
   private PluginRepository repository;
   private PluginRepository.State current;
   private View root;
@@ -372,6 +372,12 @@ public class PluginFragment extends Fragment {
           input.trim().isEmpty() ? UiText.text("支持仓库、分支/子目录、Release 下载和压缩包直链") : error.getMessage());
     }
     ui.setInstallEnabled(valid && !repository.isBusy());
+  }
+
+  /** 外部要求打开“已安装”时调用（页面已在主界面翻页器里建好）。 */
+  void showInstalled() {
+    if (getView() == null) market = false;
+    else selectTab(false);
   }
 
   private void selectTab(boolean showMarket) {

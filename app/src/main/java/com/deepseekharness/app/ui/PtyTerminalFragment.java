@@ -41,7 +41,7 @@ import com.termux.view.TerminalViewClient;
  * 真正结束只发生在 {@link #shutdown()}（App 退出时 MainActivity 调）。
  */
 public final class PtyTerminalFragment extends Fragment
-    implements TerminalViewClient, PtySession.Listener {
+    implements OwnTopBar, TerminalViewClient, PtySession.Listener {
 
   /** true = 用这一页，false = 用旧的简易终端。默认 true。 */
   public static final String KEY_PTY = "term_pty";
@@ -126,6 +126,7 @@ public final class PtyTerminalFragment extends Fragment
   @Override
   public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
     c = HarnessController.get(requireContext());
+    GlassBar.padTerminal(root);
     view = root.findViewById(R.id.pty_view);
 
     view.setTerminalViewClient(this);
@@ -159,8 +160,8 @@ public final class PtyTerminalFragment extends Fragment
       renderTabs();
       return;
     }
-    if (!OWNER.ptyTabs().wasInitialized()) startTerminal();
-    else attachSelected();
+    // 第一个会话等页面真正显示（onResume）时再开：主界面会提前建好终端页，不能一启动就开 proot。
+    if (OWNER.ptyTabs().wasInitialized()) attachSelected();
   }
 
   /** 已有会话就接回去（切页面回来不丢历史），没有就起一个。 */
@@ -377,8 +378,13 @@ public final class PtyTerminalFragment extends Fragment
         .show();
     try {
       // 容器 id 动态取，不硬编码 MainActivity 的布局细节
+      // 主界面里由翻页器换页（偏好已经写好）。
+      if (getActivity() instanceof MainActivity main) {
+        main.refreshTabs();
+        return;
+      }
       int containerId = ((ViewGroup) requireView().getParent()).getId();
-      UiMotion.page(requireContext(), getParentFragmentManager().beginTransaction())
+      UiMotion.tab(requireContext(), getParentFragmentManager().beginTransaction())
           .replace(containerId, new TerminalFragment())
           .commit();
     } catch (Throwable e) {
@@ -410,7 +416,10 @@ public final class PtyTerminalFragment extends Fragment
   public void onResume() {
     super.onResume();
     OWNER.attachPty(tabsObserver);
-    if (view != null && c != null) attachSelected();
+    if (view != null && c != null) {
+      if (!OWNER.ptyTabs().wasInitialized() && c.proot().isEnvironmentReady()) startTerminal();
+      else attachSelected();
+    }
   }
 
   @Override

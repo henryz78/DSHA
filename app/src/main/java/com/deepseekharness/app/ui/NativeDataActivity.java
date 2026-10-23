@@ -49,11 +49,9 @@ public final class NativeDataActivity extends AppCompatActivity {
 
   private Pending pending;
   private NativeBackupJobs jobs;
-  private LinearLayout page, body;
-  private TextView status, project;
-  private Spinner scope;
-  private Button cancelOperation;
-  private CheckBox key;
+  private HyLine status, project, cancelOperation, key;
+  private final List<HyLine> scopeLines = new ArrayList<>();
+  private final android.os.Handler main = new android.os.Handler(android.os.Looper.getMainLooper());
   private List<BackupSource> projects;
   private androidx.appcompat.app.AlertDialog previewDialog;
 
@@ -71,7 +69,7 @@ public final class NativeDataActivity extends AppCompatActivity {
               pending.reexportId = null;
               try {
                 if (uri != null && !jobs.reexport(source, pending.password, uri, pending.filename))
-                  status.setText(
+                  setStatus(
                       t(
                           "副本无法重新导出，请检查记录或当前作业。",
                           "The copy cannot be exported. Review its record or the current operation."));
@@ -86,7 +84,7 @@ public final class NativeDataActivity extends AppCompatActivity {
             }
             if (!pending.exportPrepared || pending.selection == null || pending.filename == null) {
               pending.clear();
-              status.setText(
+              setStatus(
                   t(
                       "应用在选择保存位置期间重新启动，请重新发起导出。",
                       "The app restarted while choosing a destination. Start the export again."));
@@ -94,7 +92,7 @@ public final class NativeDataActivity extends AppCompatActivity {
             }
             pending.exportPrepared = false;
             if (!jobs.export(pending.selection, uri, pending.filename, pending.rescue))
-              status.setText(
+              setStatus(
                   t(
                       "已有任务或无法创建私有作业，请检查状态。",
                       "A task is already running or private storage is unavailable."));
@@ -116,10 +114,11 @@ public final class NativeDataActivity extends AppCompatActivity {
                       "project-" + NativeDataLocations.hash(uri.toString()),
                       "projects",
                       ""));
-              project.setText(
+              if (project != null)
+                project.setText(
                   com.deepseekharness.app.util.UiText.format("已选择项目目录：%s", projects.size()));
             } catch (Exception error) {
-              status.setText(t("无法读取所选目录，请重新授权。", "Cannot read the folder. Grant access again."));
+              setStatus(t("无法读取所选目录，请重新授权。", "Cannot read the folder. Grant access again."));
             }
           });
   private final ActivityResultLauncher<String[]> restorePicker =
@@ -135,42 +134,20 @@ public final class NativeDataActivity extends AppCompatActivity {
     pending = new ViewModelProvider(this).get(Pending.class);
     projects = pending.projects;
     jobs = NativeBackupJobs.get(this);
-    ScrollView scroll = new ScrollView(this);
-    scroll.setFillViewport(true);
-    scroll.setBackgroundColor(getColor(R.color.surface));
-    page = new LinearLayout(this);
-    page.setOrientation(LinearLayout.VERTICAL);
-    int pad = dp(20);
-    page.setPadding(pad, dp(12), pad, pad);
-    body = page;
-    scroll.addView(page);
-    setContentView(scroll);
     String mode = getIntent().getStringExtra("data_mode");
     boolean exportOnly = "export".equals(mode),
         restoreOnly = "restore".equals(mode),
         backupMode = "backup".equals(mode);
-    LinearLayout navigation = new LinearLayout(this);
-    navigation.setGravity(android.view.Gravity.CENTER_VERTICAL);
-    var back = UiNavigation.back(this, this::finish);
-    navigation.addView(back, new LinearLayout.LayoutParams(dp(44), dp(48)));
-    TextView brand = new TextView(this);
-    brand.setText(R.string.app_name);
-    brand.setTextSize(18);
-    brand.setTextColor(getColor(R.color.text));
-    navigation.addView(brand);
-    page.addView(navigation);
-    TextView title =
-        text(
-            backupMode
-                ? t("备份与恢复", "Backup and restore")
-                : exportOnly
-                    ? t("数据导出", "Data export")
-                    : restoreOnly
-                        ? t("从备份恢复", "Restore a backup")
-                        : t("应用数据与救援", "Application data and recovery"),
-            24);
-    title.setTypeface(null, android.graphics.Typeface.BOLD);
-    text(
+    String heading =
+        backupMode
+            ? t("备份与恢复", "Backup and restore")
+            : exportOnly
+                ? t("数据导出", "Data export")
+                : restoreOnly
+                    ? t("从备份恢复", "Restore a backup")
+                    : t("应用数据与救援", "Application data and recovery");
+    var model = new HyScreenModel(heading);
+    model.note(
         backupMode
             ? t("导出、导入和自动备份集中在这里。", "Export, import and automatic backups in one place.")
             : exportOnly
@@ -183,125 +160,104 @@ public final class NativeDataActivity extends AppCompatActivity {
                         "Verify backup contents before confirming what to restore.")
                     : t(
                         "运行环境不可用时，也能检查并保护可读取的数据。",
-                        "Inspect and protect readable data even when the runtime is unavailable."),
-        13);
-    status = text("", 14);
-    status.setTextIsSelectable(true);
-    status.setBackgroundResource(R.drawable.bg_card);
-    status.setPadding(dp(16), dp(12), dp(16), dp(12));
-    section(t("选择数据范围", "Choose data scope"));
-    if (restoreOnly) body.setVisibility(View.GONE);
-    scope =
-        choice(
-            new String[] {
-              t("应用数据", "Application data"),
-              t("对话与附件", "Conversations and attachments"),
-              t("设置", "Settings"),
-              t("插件", "Plugins"),
-              t("所选项目文件", "Selected project files")
-            });
-    body.addView(scope, new LinearLayout.LayoutParams(-1, -2));
-    scope.setPrompt(t("数据范围", "Data scope"));
-    scope.setSelection(pending.scopeIndex);
-    scope.setOnItemSelectedListener(
-        new AdapterView.OnItemSelectedListener() {
-          public void onNothingSelected(AdapterView<?> parent) {}
-
-          public void onItemSelected(AdapterView<?> parent, View view, int index, long id) {
-            pending.scopeIndex = index;
-          }
-        });
-    key = new CheckBox(this);
-    key.setText(t("包含原生 API Key（默认不包含）", "Include native API key (excluded by default)"));
-    key.setIncludeFontPadding(false);
-    key.setGravity(android.view.Gravity.CENTER_VERTICAL);
-    key.setMinimumHeight(dp(48));
-    key.setChecked(false);
-    body.addView(key);
-    key.setChecked(pending.includeKey);
-    key.setOnCheckedChangeListener((button, checked) -> pending.includeKey = checked);
-    project =
-        text(
-            t(
-                "项目文件需单独选择目录；不会扫描整部手机。",
-                "Choose project folders explicitly; the app does not scan the whole device."),
-            14);
-    button(t("选择项目目录", "Choose project folder"), () -> projectPicker.launch(null));
-    button(t("查看数据范围与位置", "Review data scope and locations"), this::locations);
-    section(
-        exportOnly
-            ? t("导出选项", "Export options")
-            : restoreOnly ? t("选择并验证", "Select and verify") : t("导出与恢复", "Export and restore"));
+                        "Inspect and protect readable data even when the runtime is unavailable."));
+    status = model.section("").selectable("");
+    status.setVisible(false);
     if (!restoreOnly) {
-      Button export =
-          button(t("导出应用数据", "Export application data"), () -> chooseExport(false, null));
-      export.setBackgroundResource(R.drawable.bg_btn_primary);
-      export.setTextColor(
-          androidx.core.content.ContextCompat.getColorStateList(this, R.color.button_primary_text));
-    }
-    if (!exportOnly && !restoreOnly && !backupMode)
-      button(t("只读救援导出", "Read-only rescue export"), () -> chooseExport(true, null));
-    if (!exportOnly) {
-      Button restore =
-          button(
-              t("导入备份", "Import backup"),
-              () ->
-                  restorePicker.launch(
-                      new String[] {
-                        com.deepseekharness.app.util.BackupFileNames.MIME_TYPE,
-                        "application/octet-stream",
-                        "application/gzip",
-                        "*/*"
-                      }));
-      if (restoreOnly) {
-        restore.setBackgroundResource(R.drawable.bg_btn_primary);
-        restore.setTextColor(getColorStateList(R.color.button_primary_text));
+      var scopeGroup = model.section(t("选择数据范围", "Choose data scope"));
+      String[] scopes = {
+        t("应用数据", "Application data"),
+        t("对话与附件", "Conversations and attachments"),
+        t("设置", "Settings"),
+        t("插件", "Plugins"),
+        t("所选项目文件", "Selected project files")
+      };
+      for (int i = 0; i < scopes.length; i++) {
+        final int index = i;
+        scopeLines.add(scopeGroup.radio(scopes[i], i == pending.scopeIndex, () -> selectScope(index)));
       }
+      key =
+          scopeGroup.check(
+              t("包含原生 API Key（默认不包含）", "Include native API key (excluded by default)"),
+              pending.includeKey,
+              checked -> {
+                pending.includeKey = checked;
+                key.setChecked(checked);
+              });
+      project =
+          scopeGroup.text(
+              t(
+                  "项目文件需单独选择目录；不会扫描整部手机。",
+                  "Choose project folders explicitly; the app does not scan the whole device."));
+      scopeGroup.arrow(t("选择项目目录", "Choose project folder"), "", () -> projectPicker.launch(null));
+      scopeGroup.arrow(t("查看数据范围与位置", "Review data scope and locations"), "", this::locations);
     }
+    var actions =
+        model.section(
+            exportOnly
+                ? t("导出选项", "Export options")
+                : restoreOnly ? t("选择并验证", "Select and verify") : t("导出与恢复", "Export and restore"));
+    if (!restoreOnly)
+      actions.button(t("导出应用数据", "Export application data"), true, () -> chooseExport(false, null));
     if (!exportOnly && !restoreOnly && !backupMode)
-      button(t("重新导出已验证副本", "Export a verified copy again"), this::verifiedCopies);
+      actions.button(t("只读救援导出", "Read-only rescue export"), false, () -> chooseExport(true, null));
+    if (!exportOnly)
+      actions.button(
+          t("导入备份", "Import backup"),
+          restoreOnly,
+          () ->
+              restorePicker.launch(
+                  new String[] {
+                    com.deepseekharness.app.util.BackupFileNames.MIME_TYPE,
+                    "application/octet-stream",
+                    "application/gzip",
+                    "*/*"
+                  }));
+    if (!exportOnly && !restoreOnly && !backupMode)
+      actions.arrow(t("重新导出已验证副本", "Export a verified copy again"), "", this::verifiedCopies);
     if (backupMode)
-      button(
+      actions.arrow(
           t("自动备份与记录", "Automatic backups and history"),
+          "",
           () -> startActivity(new android.content.Intent(this, AutomaticBackupActivity.class)));
-    cancelOperation = button(t("取消当前作业", "Cancel current operation"), () -> jobs.cancel());
-    cancelOperation.setVisibility(View.GONE);
+    cancelOperation = actions.button(t("取消当前作业", "Cancel current operation"), false, () -> jobs.cancel());
+    cancelOperation.setVisible(false);
     if (!exportOnly && !restoreOnly) {
-      section(t("保留数据", "Retained data"));
-      text(
+      var retained = model.section(t("保留数据", "Retained data"));
+      retained.arrow(
+          t("保留副本与旧树", "Retained copies and old trees"),
           t(
               "查看保留副本、旧环境和插件原件；检查与恢复分别处理。",
               "Browse retained copies, old environments, and original plugins. Inspection and restoration are separate actions."),
-          13);
-      button(
-          t("保留副本与旧树", "Retained copies and old trees"),
           () -> startActivity(new android.content.Intent(this, RetainedDataActivity.class)));
     }
-    section(t("恢复与维护", "Recovery and maintenance"));
-    if (exportOnly || restoreOnly || backupMode) body.setVisibility(View.GONE);
-    button(t("选择已有数据目录", "Choose existing data directory"), this::chooseDataHome);
-    button(
-        t("恢复中断的数据提交", "Recover interrupted data commit"),
-        () -> {
-          new DshaDialogBuilder(this, true)
-              .setTitle(t("恢复中断的数据提交", "Recover interrupted data commit"))
-              .setMessage(
-                  t(
-                      "将先停止写任务，再根据宿主日志恢复一致状态。无需旧 Python 或备份密码，原件将保留。",
-                      "Stop writers first, then restore consistency from the host journal. The old Python and backup password are not required. Originals are retained."))
-              .setPositiveButton(
-                  t("继续", "Continue"),
-                  (d, w) -> {
-                    if (!jobs.recoverPending())
-                      status.setText(
-                          t(
-                              "没有可自动处理的提交，或需要先检查损坏/冲突的日志。",
-                              "No automatically recoverable commit, or damaged/conflicting records need review."));
-                  })
-              .setNegativeButton(t("取消", "Cancel"), null)
-              .show();
-        });
-    button(t("回退兼容运行时", "Roll back compatible runtime"), () -> RuntimeRecoveryUi.show(this));
+    if (!exportOnly && !restoreOnly && !backupMode) {
+      var maintenance = model.section(t("恢复与维护", "Recovery and maintenance"));
+      maintenance.arrow(t("选择已有数据目录", "Choose existing data directory"), "", this::chooseDataHome);
+      maintenance.arrow(
+          t("恢复中断的数据提交", "Recover interrupted data commit"),
+          "",
+          () ->
+              new DshaDialogBuilder(this, true)
+                  .setTitle(t("恢复中断的数据提交", "Recover interrupted data commit"))
+                  .setMessage(
+                      t(
+                          "将先停止写任务，再根据宿主日志恢复一致状态。无需旧 Python 或备份密码，原件将保留。",
+                          "Stop writers first, then restore consistency from the host journal. The old Python and backup password are not required. Originals are retained."))
+                  .setPositiveButton(
+                      t("继续", "Continue"),
+                      (d, w) -> {
+                        if (!jobs.recoverPending())
+                          setStatus(
+                              t(
+                                  "没有可自动处理的提交，或需要先检查损坏/冲突的日志。",
+                                  "No automatically recoverable commit, or damaged/conflicting records need review."));
+                      })
+                  .setNegativeButton(t("取消", "Cancel"), null)
+                  .show());
+      maintenance.arrow(t("回退兼容运行时", "Roll back compatible runtime"), "", () -> RuntimeRecoveryUi.show(this));
+    }
+    setContentView(HyScreenKt.hyScreen(this, model, true));
     jobs.changes().observe(this, this::render);
     pending.preview.observe(
         this,
@@ -311,12 +267,12 @@ public final class NativeDataActivity extends AppCompatActivity {
     pending.previewError.observe(
         this,
         value -> {
-          if (value != null && !value.isEmpty()) status.setText(errorText(value));
+          if (value != null && !value.isEmpty()) setStatus(errorText(value));
         });
     if (saved == null
         && (getIntent().hasExtra("auto_restore_id") || getIntent().hasExtra("auto_export_id")))
-      page.post(this::automaticCopy);
-    if (saved == null && getIntent().hasExtra("retained_key")) page.post(this::retainedAction);
+      main.post(this::automaticCopy);
+    if (saved == null && getIntent().hasExtra("retained_key")) main.post(this::retainedAction);
     if (saved == null && getIntent().hasExtra("restore_uri")) {
       Uri input = Uri.parse(getIntent().getStringExtra("restore_uri"));
       if ("content".equals(input.getScheme()))
@@ -350,7 +306,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                         if (!isFinishing() && !isDestroyed()) chooseReexport(copy);
                       });
               } catch (Exception error) {
-                runOnUiThread(() -> status.setText(errorText(BackupErrorCode.from(error))));
+                runOnUiThread(() -> setStatus(errorText(BackupErrorCode.from(error))));
               } finally {
                 if (secret != null) Arrays.fill(secret, '\0');
               }
@@ -391,7 +347,7 @@ public final class NativeDataActivity extends AppCompatActivity {
   }
 
   private void verifiedCopies() {
-    status.setText(t("正在读取私有副本记录…", "Reading private copy records…"));
+    setStatus(t("正在读取私有副本记录…", "Reading private copy records…"));
     new Thread(
             () -> {
               try {
@@ -408,10 +364,10 @@ public final class NativeDataActivity extends AppCompatActivity {
                                       " 份记录暂不可用，原件已保留；其余副本仍可选择。",
                                       " records are unavailable and retained; other copies can still be selected.");
                       if (copies.isEmpty()) {
-                        status.setText(UiText.format("还没有可重新导出的私有验证副本。\n%s", unavailable));
+                        setStatus(UiText.format("还没有可重新导出的私有验证副本。\n%s", unavailable));
                         return;
                       }
-                      if (!unavailable.isEmpty()) status.setText(unavailable);
+                      if (!unavailable.isEmpty()) setStatus(unavailable);
                       String[] labels = new String[copies.size()];
                       for (int i = 0; i < labels.length; i++) {
                         var copy = copies.get(i);
@@ -448,7 +404,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                 runOnUiThread(
                     () -> {
                       if (!isFinishing() && !isDestroyed())
-                        status.setText(errorText(BackupErrorCode.from(error)));
+                        setStatus(errorText(BackupErrorCode.from(error)));
                     });
               }
             },
@@ -466,7 +422,7 @@ public final class NativeDataActivity extends AppCompatActivity {
       int index =
           List.of("application", "sessions", "settings", "plugins", "projects")
               .indexOf(entry.scope);
-      if (index >= 0) scope.setSelection(index);
+      if (index >= 0) selectScope(index);
       if ("reexport".equals(action) && entry.part.equals("encrypted"))
         chooseReexport(
             VerifiedBackupCopy.inspect(
@@ -489,7 +445,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                 t("开始预检", "Inspect"),
                 (dialog, which) -> {
                   if (!jobs.prepareRestoreTree(entry.key(), Set.of(entry.scope), "PRIVATE"))
-                    status.setText(
+                    setStatus(
                         t(
                             "无法开始预检，请检查记录或当前任务。",
                             "Inspection could not start. Review the record or current operation."));
@@ -498,7 +454,7 @@ public final class NativeDataActivity extends AppCompatActivity {
             .show();
       }
     } catch (Exception error) {
-      status.setText(errorText(BackupErrorCode.from(error)));
+      setStatus(errorText(BackupErrorCode.from(error)));
     }
   }
 
@@ -506,8 +462,8 @@ public final class NativeDataActivity extends AppCompatActivity {
     NativeDataLocations.Selection selected = new NativeDataLocations.Selection();
     selected.scope =
         new String[] {"application", "sessions", "settings", "plugins", "projects"}
-            [scope.getSelectedItemPosition()];
-    selected.includeApiKey = key.isChecked();
+            [pending.scopeIndex];
+    selected.includeApiKey = pending.includeKey;
     selected.documentProjects.addAll(projects);
     return selected;
   }
@@ -520,7 +476,7 @@ public final class NativeDataActivity extends AppCompatActivity {
     NativeDataLocations.Selection selected = selection();
     var owner = pending;
     android.content.Context app = getApplicationContext();
-    status.setText(t("正在统计所选范围、大小与排除项…", "Reviewing selected scope, sizes and exclusions…"));
+    setStatus(t("正在统计所选范围、大小与排除项…", "Reviewing selected scope, sizes and exclusions…"));
     new Thread(
             () -> {
               try {
@@ -630,7 +586,7 @@ public final class NativeDataActivity extends AppCompatActivity {
           copy.passwordProtected(new AndroidBackupFileSystem())
               && !Boolean.TRUE.equals(copy.metadata.get("automatic"));
     } catch (java.io.IOException error) {
-      status.setText(errorText(BackupErrorCode.from(error)));
+      setStatus(errorText(BackupErrorCode.from(error)));
       return;
     }
     if (!needsOriginal) {
@@ -697,7 +653,7 @@ public final class NativeDataActivity extends AppCompatActivity {
     pending.protectionControl = new BackupControl(null);
     var probe = pending.protectionControl;
     var owner = pending;
-    status.setText(t("正在识别备份格式…", "Identifying backup format…"));
+    setStatus(t("正在识别备份格式…", "Identifying backup format…"));
     new Thread(
             () -> {
               try {
@@ -727,7 +683,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                 runOnUiThread(
                     () -> {
                       if (!isFinishing() && !isDestroyed())
-                        status.setText(errorText(BackupErrorCode.from(error)));
+                        setStatus(errorText(BackupErrorCode.from(error)));
                     });
               } finally {
                 owner.protectionBusy = false;
@@ -796,11 +752,11 @@ public final class NativeDataActivity extends AppCompatActivity {
                                 copy, secret, selected, includeKey, location))
                               runOnUiThread(
                                   () ->
-                                      status.setText(
+                                      setStatus(
                                           t("已有任务，完成后再试。", "Another task is in progress.")));
                           } catch (Exception error) {
                             runOnUiThread(
-                                () -> status.setText(errorText(BackupErrorCode.from(error))));
+                                () -> setStatus(errorText(BackupErrorCode.from(error))));
                           } finally {
                             if (secret != null) Arrays.fill(secret, '\0');
                           }
@@ -816,7 +772,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                     copy == null
                         ? jobs.prepareRestore(uri, chars, selected, includeKey, location)
                         : jobs.prepareRestoreCopy(copy, chars, selected, includeKey, location);
-                if (!started) status.setText(t("已有任务，完成后再试。", "Another task is in progress."));
+                if (!started) setStatus(t("已有任务，完成后再试。", "Another task is in progress."));
               } finally {
                 if (chars != null) Arrays.fill(chars, '\0');
               }
@@ -873,15 +829,14 @@ public final class NativeDataActivity extends AppCompatActivity {
       previewDialog.setOnDismissListener(d -> previewDialog = null);
       previewDialog.show();
     } catch (Exception error) {
-      status.setText(
+      setStatus(
           t("预检记录不可读取，请重新选择备份。", "The inspection record is unavailable. Select the backup again."));
     }
   }
 
   private void render(NativeBackupJobs.State value) {
     if (value == null) return;
-    if (cancelOperation != null)
-      cancelOperation.setVisibility(value.busy ? View.VISIBLE : View.GONE);
+    if (cancelOperation != null) cancelOperation.setVisible(value.busy);
     if (value.stage.equals("PREVIEW")) {
       restorePreview(value);
       return;
@@ -941,7 +896,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                                                         "The interrupted commit is consistent again; originals were retained.")
                                                     : stage(value.stage);
     String projection = com.deepseekharness.app.data.PortableSettings.errorCode(this);
-    status.setText(
+    setStatus(
         com.deepseekharness.app.util.UiText.format(
             "%s\n%s 项 · %s%s%s",
             result,
@@ -1094,43 +1049,11 @@ public final class NativeDataActivity extends AppCompatActivity {
     return Math.round(n * getResources().getDisplayMetrics().density);
   }
 
-  private TextView text(String value, int size) {
-    TextView text = new TextView(this);
-    text.setText(value);
-    text.setTextSize(size);
-    text.setTextColor(getColor(R.color.text));
-    text.setPadding(0, dp(10), 0, dp(10));
-    body.addView(text);
-    return text;
-  }
 
-  private Button button(String label, Runnable click) {
-    Button button = new androidx.appcompat.widget.AppCompatButton(this);
-    button.setTextSize(13);
-    button.setBackgroundResource(R.drawable.bg_action_plain);
-    button.setTextColor(getColor(R.color.primary));
-    button.setText(label);
-    button.setAllCaps(false);
-    button.setIncludeFontPadding(false);
-    button.setGravity(android.view.Gravity.CENTER);
-    button.setMinHeight(dp(48));
-    button.setOnClickListener(v -> click.run());
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.topMargin = dp(8);
-    body.addView(button, params);
-    return button;
-  }
 
-  private void section(String title) {
-    body = new LinearLayout(this);
-    body.setOrientation(LinearLayout.VERTICAL);
-    body.setPadding(dp(14), dp(10), dp(14), dp(14));
-    body.setBackgroundResource(R.drawable.bg_card);
-    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
-    params.topMargin = dp(16);
-    page.addView(body, params);
-    text(title, 16).setTypeface(null, android.graphics.Typeface.BOLD);
-  }
+
+
+
 
   private Spinner choice(String[] items) {
     Spinner choice = new DshaSelectView(this);
@@ -1139,5 +1062,15 @@ public final class NativeDataActivity extends AppCompatActivity {
     choice.setPadding(dp(8), 0, dp(8), 0);
     choice.setAdapter(new ArrayAdapter<>(this, R.layout.item_data_choice, items));
     return choice;
+  }
+
+  private void selectScope(int index) {
+    pending.scopeIndex = index;
+    for (int i = 0; i < scopeLines.size(); i++) scopeLines.get(i).setChecked(i == index);
+  }
+
+  private void setStatus(CharSequence text) {
+    status.setText(String.valueOf(text));
+    status.setVisible(text.length() > 0);
   }
 }

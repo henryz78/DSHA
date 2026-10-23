@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "runtimeId": "9a6fe1a40ab710d706823629454f103b6cd9a9a07a362e5ec8bb8d53f17fb130",
+  "runtimeId": "9f9b1ce6252e8387df7b6d96b8ec7de110490828ade620c00a7481c0deb8ad9a",
   "baseVersion": "10",
   "dshVersion": "0.2.1-rc.2",
   "launcherContract": "DSHA_ARM64_V2",
@@ -365,7 +365,7 @@
     "util/WebStopDiagnostic.java": "d196df03c062b171b4aecb69db84ad78c9edb836e483e1b89abe2b211887038c",
     "util/WebStopException.java": "194c52167b628cfb108f5b25664773384e9f7d0929cc1662df9495cf41eb584a",
     "vscreen/VirtualScreenAccessibility.java": "0b3737f7b454af7c57791df11ce0f665a29feb1ea374c7e5633b39a22ed9c0d2",
-    "vscreen/VirtualScreenActivity.java": "bb5d77696960be2c39a0af08ce0d2c17e3111eeef9bce3db60325a378544d1c4",
+    "vscreen/VirtualScreenActivity.java": "ff8c8d6d49d3a57888f1918d3aa68d357faf811c10d6bb04c00bdb1a24dcc10a",
     "vscreen/VirtualScreenAnchorProof.java": "24d44f98461b9fab78be4764c8d628beedae1513071e49fd82e85a0cbb319ab7",
     "vscreen/VirtualScreenChannel.java": "4431d058f9a77bcfb2da798d23b0e70ca935367ee4f2f45979647db560b90ebc",
     "vscreen/VirtualScreenChannels.java": "195f68b70bcdc3a381cb7cc86ebfce045e4e43ba35daa6aca139da26aba4b401",

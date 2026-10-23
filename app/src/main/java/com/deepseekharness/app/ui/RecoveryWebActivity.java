@@ -53,22 +53,18 @@ public final class RecoveryWebActivity extends AppCompatActivity {
     setContentView(root);
     LinearLayout toolbar = new LinearLayout(this);
     toolbar.setOrientation(LinearLayout.HORIZONTAL);
+    int gap = Math.round(8 * getResources().getDisplayMetrics().density);
+    toolbar.setPadding(gap + gap / 2, gap, gap + gap / 2, gap);
     root.addView(toolbar, new LinearLayout.LayoutParams(-1, -2));
-    Button repairs = new androidx.appcompat.widget.AppCompatButton(this);
+    MiuixButton repairs = new MiuixButton(this);
     repairs.setText(UiText.choose("应急 DSH · 修复提案", "Emergency DSH · Repairs"));
-    repairs.setTextSize(14);
-    repairs.setAllCaps(false);
-    repairs.setBackgroundResource(R.drawable.bg_btn);
-    repairs.setTextColor(getColorStateList(R.color.button_text));
+    repairs.setPrimary(false);
     repairs.setOnClickListener(v -> startActivity(new Intent(this, RecoveryActivity.class)));
     toolbar.addView(repairs, new LinearLayout.LayoutParams(0, -2, 3));
-    Button retry = new androidx.appcompat.widget.AppCompatButton(this);
+    MiuixButton retry = new MiuixButton(this);
     retry.setText(UiText.choose("重载", "Reload"));
     retry.setContentDescription(UiText.choose("重新加载应急页面", "Reload emergency page"));
-    retry.setTextSize(14);
-    retry.setAllCaps(false);
-    retry.setBackgroundResource(R.drawable.bg_action_plain);
-    retry.setTextColor(getColorStateList(R.color.button_text));
+    retry.setPrimary(false);
     retry.setOnClickListener(
         v -> {
           if (retained.browser != null) {
@@ -77,7 +73,9 @@ public final class RecoveryWebActivity extends AppCompatActivity {
           }
           recreate();
         });
-    toolbar.addView(retry, new LinearLayout.LayoutParams(0, -2, 1));
+    LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(0, -2, 1);
+    retryParams.leftMargin = gap;
+    toolbar.addView(retry, retryParams);
     status = new TextView(this);
     status.setTextSize(14);
     status.setTextColor(getColor(R.color.err));
@@ -114,7 +112,7 @@ public final class RecoveryWebActivity extends AppCompatActivity {
               "本次应急启动未取得模型密钥。诊断页仍可用；发送对话前，请返回应急页停止服务并填写临时 API Key 后重新启动。",
               "No model key was available at recovery startup. Diagnostics remain available. To chat, return to Recovery, stop the service, enter a temporary API key, and restart."));
       notice.addView(hint);
-      Button configure = new androidx.appcompat.widget.AppCompatButton(this);
+      MiuixButton configure = new MiuixButton(this);
       configure.setText(UiText.choose("返回应急页配置", "Open recovery settings"));
       configure.setOnClickListener(v -> startActivity(new Intent(this, RecoveryActivity.class)));
       notice.addView(configure, new LinearLayout.LayoutParams(-1, -2));

@@ -374,6 +374,9 @@ dependencies {
     // 新界面：Compose + miuix（HyperOS 风格组件库，实验阶段，锁定版本）。
     implementation 'top.yukonga.miuix.kmp:miuix-ui-android:0.9.4'
     implementation 'top.yukonga.miuix.kmp:miuix-preference-android:0.9.4'
+    // miuix 扩展图标，以及液态玻璃底栏用的背景模糊（模糊仅 Android 13+ 生效）。
+    implementation 'top.yukonga.miuix.kmp:miuix-icons-android:0.9.4'
+    implementation 'top.yukonga.miuix.kmp:miuix-blur-android:0.9.4'
     standardImplementation 'dev.rikka.shizuku:api:13.1.5'
     standardImplementation 'dev.rikka.shizuku:provider:13.1.5'
     // 真 PTY 终端：Termux 拆出的 terminal-view/terminal-emulator（Apache 2.0），

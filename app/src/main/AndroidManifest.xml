@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- miuix-blur 声明 API 33；只在玻璃底栏且 Android 13+ 时才调用（GlassBar.supported）。 -->
+    <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
+
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- Chromium 枚举/选择录音设备同时要求此普通权限；录音本身仍须按需获得用户授权。 -->

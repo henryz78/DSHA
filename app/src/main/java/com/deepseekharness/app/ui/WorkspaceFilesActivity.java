@@ -127,11 +127,11 @@ public final class WorkspaceFilesActivity extends AppCompatActivity {
   }
 
   private Model model;
-  private ListView files;
-  private TextView location, status;
-  private Button workspace, root, up, refresh, cancel;
-  private Button previousPage, nextPage;
-  private LinearLayout pagination;
+  private HyGroup files;
+  private HyLine location, status;
+  private HyLine workspace, root, up, refresh, cancel;
+  private HyLine previousPage, nextPage;
+  private final java.util.List<HyLine> fileLines = new ArrayList<>();
   private String workspaceId;
 
   /** Shared native entry; no extras or elevated permissions are required. */
@@ -177,71 +177,48 @@ public final class WorkspaceFilesActivity extends AppCompatActivity {
       }
     }
 
-    LinearLayout body = new LinearLayout(this);
-    body.setOrientation(LinearLayout.VERTICAL);
-    body.setBackgroundColor(getColor(R.color.surface));
-    body.setPadding(dp(12), dp(6), dp(12), dp(12));
-    setContentView(body);
-    UiNavigation.addHeader(this, body, UiText.choose("作品文件导出", "Export work files"), this::finish);
-    TextView note =
-        text(
-            UiText.choose(
-                "选择工作目录里的作品文件，保存到手机或分享给其他应用。无需 Root；这是普通文件导出，完整数据备份另有入口。",
-                "Choose a file from your workspace to save on the device or share with another app. No root is needed. Full data backups have a separate entry."),
-            13);
-    body.addView(note);
-    LinearLayout navigation = new LinearLayout(this);
-    workspace = button(UiText.choose("工作目录", "Workspace"), () -> load(workspaceId, 0, true));
-    root = button("DSHA", () -> load("root"));
-    up = button(UiText.choose("上一级", "Up"), this::parent);
-    refresh = button(UiText.choose("刷新", "Refresh"), () -> load(model.directory));
-    for (Button button : new Button[] {workspace, root, up, refresh}) {
-      LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(0, -2, 1);
-      params.setMargins(dp(2), dp(6), dp(2), dp(6));
-      navigation.addView(button, params);
-    }
-    body.addView(navigation);
-    location = text("", 13);
-    location.setTextIsSelectable(true);
-    body.addView(location);
-    status = text("", 13);
-    status.setTextIsSelectable(true);
-    status.setMaxLines(5);
-    body.addView(status);
+    var screen = new HyScreenModel(UiText.choose("作品文件导出", "Export work files"));
+    screen.note(
+        UiText.choose(
+            "选择工作目录里的作品文件，保存到手机或分享给其他应用。无需 Root；这是普通文件导出，完整数据备份另有入口。",
+            "Choose a file from your workspace to save on the device or share with another app. No root is needed. Full data backups have a separate entry."));
+    var where = screen.section("");
+    location = where.selectable("");
+    status = where.selectable("");
     cancel =
-        button(
+        where.button(
             UiText.choose("取消导出", "Cancel export"),
+            false,
             () -> {
               BackupControl control = model.control;
               if (control != null) control.cancel();
             });
-    body.addView(cancel);
-    files = new ListView(this);
-    files.setDividerHeight(dp(1));
-    body.addView(files, new LinearLayout.LayoutParams(-1, 0, 1));
-    pagination = new LinearLayout(this);
+    var navigation = screen.section(UiText.choose("跳转", "Go to"));
+    workspace =
+        navigation.arrow(
+            UiText.choose("工作目录", "Workspace"), "", R.drawable.ic_ui2_folder, () -> load(workspaceId, 0, true));
+    root = navigation.arrow(UiText.choose("应用根目录", "App root"), "", R.drawable.ic_ui2_box, () -> load("root"));
+    up = navigation.arrow(UiText.choose("上一级", "Up"), "", R.drawable.ic_ui_back, this::parent);
+    refresh =
+        navigation.arrow(
+            UiText.choose("刷新", "Refresh"), "", R.drawable.ic_recovery_refresh, () -> load(model.directory));
+    files = screen.section(UiText.choose("文件", "Files"));
+    var pagination = screen.section("");
     previousPage =
-        button(
+        pagination.button(
             UiText.choose("上一页", "Previous page"),
+            false,
             () -> load(model.directory, Math.max(0, model.offset - PAGE_SIZE)));
     nextPage =
-        button(
+        pagination.button(
             UiText.choose("下一页", "Next page"),
+            false,
             () -> load(model.directory, model.offset + PAGE_SIZE));
-    pagination.addView(previousPage, new LinearLayout.LayoutParams(0, -2, 1));
-    pagination.addView(nextPage, new LinearLayout.LayoutParams(0, -2, 1));
-    body.addView(pagination);
-    files.setOnItemClickListener(
-        (parent, view, position, id) -> {
-          if (model.working.get() || model.choosingDestination) return;
-          Entry entry = (Entry) files.getAdapter().getItem(position);
-          if (entry.directory) load(entry.id);
-          else actions(entry);
-        });
+    setContentView(HyScreenKt.hyScreen(this, screen, true));
     model.page.observe(
         this,
         page -> {
-          if (page != null) files.setAdapter(new FileRows(page.entries));
+          if (page != null) showEntries(page.entries);
           render();
         });
     model.notice.observe(this, notice -> render());
@@ -454,15 +431,15 @@ public final class WorkspaceFilesActivity extends AppCompatActivity {
     if (files == null) return;
     boolean working = model.working.get();
     boolean enabled = !working && !model.choosingDestination;
-    for (Button button : new Button[] {workspace, root, up, refresh}) button.setEnabled(enabled);
+    for (HyLine button : new HyLine[] {workspace, root, up, refresh}) button.setEnabled(enabled);
     up.setEnabled(enabled && !"root".equals(model.directory));
-    files.setEnabled(enabled);
+    for (HyLine line : fileLines) line.setEnabled(enabled);
     Page page = model.page.getValue();
-    boolean paged = page != null && (page.offset > 0 || page.more);
-    pagination.setVisibility(paged ? View.VISIBLE : View.GONE);
-    previousPage.setEnabled(enabled && page != null && page.offset > 0);
-    nextPage.setEnabled(enabled && page != null && page.more);
-    cancel.setVisibility(working ? View.VISIBLE : View.GONE);
+    previousPage.setVisible(page != null && page.offset > 0);
+    nextPage.setVisible(page != null && page.more);
+    previousPage.setEnabled(enabled);
+    nextPage.setEnabled(enabled);
+    cancel.setVisible(working);
     Notice notice = model.notice.getValue();
     if (notice == null) return;
     String message;
@@ -512,7 +489,7 @@ public final class WorkspaceFilesActivity extends AppCompatActivity {
     try {
       location.setText(UiText.format("位置：%s", WorkspaceDocumentIds.location(model.directory)));
     } catch (IOException invalid) {
-      location.setText("DSHA");
+      location.setText("HYDSH");
     }
   }
 
@@ -545,68 +522,26 @@ public final class WorkspaceFilesActivity extends AppCompatActivity {
     }
   }
 
-  private TextView text(String value, int size) {
-    TextView view = new TextView(this);
-    view.setText(value);
-    view.setTextSize(size);
-    view.setTextColor(getColor(R.color.text_secondary));
-    view.setPadding(dp(6), dp(5), dp(6), dp(5));
-    return view;
-  }
-
-  private Button button(String label, Runnable action) {
-    Button button = new androidx.appcompat.widget.AppCompatButton(this);
-    button.setText(label);
-    button.setTextSize(13);
-    button.setAllCaps(false);
-    button.setIncludeFontPadding(false);
-    button.setGravity(Gravity.CENTER);
-    button.setMinHeight(dp(48));
-    button.setBackgroundResource(R.drawable.bg_btn);
-    button.setTextColor(getColor(R.color.text));
-    button.setOnClickListener(view -> action.run());
-    return button;
-  }
-
-  private int dp(int value) {
-    return Math.round(value * getResources().getDisplayMetrics().density);
-  }
-
-  private final class FileRows extends BaseAdapter {
-    private final List<Entry> entries;
-
-    FileRows(List<Entry> entries) {
-      this.entries = entries;
-    }
-
-    @Override
-    public int getCount() {
-      return entries.size();
-    }
-
-    @Override
-    public Entry getItem(int position) {
-      return entries.get(position);
-    }
-
-    @Override
-    public long getItemId(int position) {
-      return position;
-    }
-
-    @Override
-    public View getView(int position, View recycled, ViewGroup parent) {
-      TextView row = recycled instanceof TextView ? (TextView) recycled : text("", 15);
-      Entry entry = getItem(position);
+  /** 文件清单：目录点进去继续浏览，文件弹出保存或分享。 */
+  private void showEntries(List<Entry> entries) {
+    files.clear();
+    fileLines.clear();
+    for (Entry entry : entries) {
       String description =
           entry.directory
               ? UiText.choose("目录", "Folder")
               : Formatter.formatFileSize(WorkspaceFilesActivity.this, entry.size);
-      row.setText(UiText.format("%s\n%s", entry.name, description));
-      row.setTextColor(getColor(R.color.text));
-      row.setMinHeight(dp(64));
-      row.setPadding(dp(12), dp(10), dp(12), dp(10));
-      return row;
+      fileLines.add(
+          files.arrow(
+              entry.name,
+              description,
+              entry.directory ? R.drawable.ic_ui2_folder : R.drawable.ic_recovery_document,
+              () -> {
+                if (model.working.get() || model.choosingDestination) return;
+                if (entry.directory) load(entry.id);
+                else actions(entry);
+              }));
     }
   }
+
 }

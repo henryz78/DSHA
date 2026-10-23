@@ -31,7 +31,7 @@
     <color name="primary_ripple">#1F000000</color>
     <color name="error_on">#FFFFFF</color>
     <!-- 禁用态：按钮变灰 + 文字降到可读下限（不可点却外观照旧最让人困惑） -->
-    <color name="disabled">#E9ECF2</color>
+    <color name="disabled">#F2F2F2</color>
     <!-- 状态色的浅底（用于状态条/标签背景，不刺眼） -->
     <color name="err_bg">#14C45A5A</color>
 </resources>

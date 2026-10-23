@@ -164,10 +164,29 @@ public final class DshaDialogBuilder extends MaterialAlertDialogBuilder {
             });
   }
 
+  /**
+   * 弹窗内容里有 miuix（Compose）控件时，Compose 会从弹窗窗口的根视图往上找生命周期；
+   * 弹窗窗口本身不带，找不到就崩溃。这里把所在页面的生命周期挂到窗口根视图上。
+   */
+  private void attachLifecycle(AlertDialog dialog) {
+    Context c = getContext();
+    while (c instanceof android.content.ContextWrapper
+        && !(c instanceof androidx.activity.ComponentActivity))
+      c = ((android.content.ContextWrapper) c).getBaseContext();
+    if (!(c instanceof androidx.activity.ComponentActivity owner) || dialog.getWindow() == null)
+      return;
+    android.view.View root = dialog.getWindow().getDecorView();
+    if (androidx.lifecycle.ViewTreeLifecycleOwner.get(root) != null) return;
+    androidx.lifecycle.ViewTreeLifecycleOwner.set(root, owner);
+    androidx.lifecycle.ViewTreeViewModelStoreOwner.set(root, owner);
+    androidx.savedstate.ViewTreeSavedStateRegistryOwner.set(root, owner);
+  }
+
   @Override
   public AlertDialog create() {
     AlertDialog dialog = super.create();
     if (safetyConfirmation) safetyDialogs.put(dialog, consentRevision);
+    attachLifecycle(dialog);
     if (dialog.getWindow() != null) {
       android.view.Window window = dialog.getWindow();
       window.setWindowAnimations(R.style.Animation_DSHA_Dialog);

@@ -38,27 +38,24 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:textIsSelectable="true" />
-                <Button
+                <com.deepseekharness.app.ui.MiuixButton
                     android:id="@+id/web_retry"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="24dp"
                     android:text="@string/ui_m0212" />
-                <Button
+                <com.deepseekharness.app.ui.MiuixButton
                     android:id="@+id/web_error_recovery"
-                    style="@style/Widget.DSHA.TextButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/ui_m0202" />
-                <Button
+                <com.deepseekharness.app.ui.MiuixButton
                     android:id="@+id/web_error_logs"
-                    style="@style/Widget.DSHA.TextButton"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/ui_m0047" />
-                <Button
+                <com.deepseekharness.app.ui.MiuixButton
                     android:id="@+id/web_error_browser"
-                    style="?attr/borderlessButtonStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/ui_m0095" />

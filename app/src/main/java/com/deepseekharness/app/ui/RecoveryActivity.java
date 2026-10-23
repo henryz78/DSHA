@@ -19,10 +19,11 @@ public final class RecoveryActivity extends AppCompatActivity {
   private final Handler main = new Handler(Looper.getMainLooper());
   private final AtomicBoolean reading = new AtomicBoolean();
   private CardPage page;
-  private TextView status, operation;
-  private EditText temporaryKey;
-  private Button start, open, stop;
-  private LinearLayout proposals;
+  private HyLine status, operation;
+  private HyLine temporaryKey;
+  private HyLine start, open, stop;
+  private HyGroup proposals;
+  private HyScreenModel model;
   private RecoveryController controller;
   private String lastState = "", lastPlans = "";
   private long lastPoll;
@@ -36,44 +37,27 @@ public final class RecoveryActivity extends AppCompatActivity {
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
     controller = RecoveryController.get(this);
-    page = new CardPage(this, t("应急 DSH", "Emergency DSH"), "");
-    setContentView(page.root);
-    LinearLayout intro = page.card();
-    intro.addView(
-        page.text(
-            t(
-                "正式环境维护失败时，可在这里启动独立的空白 DSH。它可以读取相关故障文件并向当前模型服务发送内容，提出修复方案；每次正式数据写入都需在此确认。",
-                "Start a separate, empty DSH when the regular environment fails. It can read affected files and send their contents to your model service to propose repairs. Confirm each write to regular data here."),
-            14,
-            R.color.text_secondary));
-    status = page.text("", 15, R.color.text);
-    status.setTextIsSelectable(true);
-    intro.addView(status);
-    LinearLayout actions = page.card();
-    actions.addView(
-        page.text(
-            t(
-                "临时 API Key（可选，仅本次应急会话使用）",
-                "Temporary API key (optional, this emergency session only)"),
-            14,
-            R.color.text));
-    temporaryKey = new EditText(this);
-    temporaryKey.setSingleLine(true);
-    temporaryKey.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-    temporaryKey.setSaveEnabled(false);
-    temporaryKey.setTextSize(15);
-    temporaryKey.setHint(t("留空时尝试已有可读凭据", "Leave blank to try an existing readable key"));
-    actions.addView(temporaryKey, new LinearLayout.LayoutParams(-1, -2));
-    if (Build.VERSION.SDK_INT >= 26)
-      temporaryKey.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);
+    // page 只用来搭建弹窗内容；页面本身是 miuix 页面。
+    page = new CardPage(this, "", "");
+    model = new HyScreenModel(t("应急 DSH", "Emergency DSH"));
+    var intro = model.section("");
+    intro.text(
+        t(
+            "正式环境维护失败时，可在这里启动独立的空白 DSH。它可以读取相关故障文件并向当前模型服务发送内容，提出修复方案；每次正式数据写入都需在此确认。",
+            "Start a separate, empty DSH when the regular environment fails. It can read affected files and send their contents to your model service to propose repairs. Confirm each write to regular data here."));
+    status = intro.selectable("");
+    var actions = model.section(t("应急服务", "Emergency service"));
+    temporaryKey =
+        actions.input(
+            t("临时 API Key（可选，仅本次使用；留空时尝试已有凭据）", "Temporary API key (optional; blank tries an existing key)"),
+            true);
     start =
-        page.button(
-            actions,
+        actions.button(
             t("启动应急 DSH", "Start emergency DSH"),
             true,
             () -> {
               try {
-                String key = temporaryKey.getText().toString();
+                String key = temporaryKey.getText();
                 RecoveryService.start(this, key.isEmpty() ? null : key);
                 temporaryKey.setText("");
                 status.setText(t("正在准备应急服务…", "Preparing the emergency service…"));
@@ -83,31 +67,25 @@ public final class RecoveryActivity extends AppCompatActivity {
               main.postDelayed(refresh, 250);
             });
     open =
-        page.button(
-            actions,
+        actions.button(
             t("进入空白应急 Web", "Open emergency Web"),
             true,
             () -> startActivity(new Intent(this, RecoveryWebActivity.class)));
     stop =
-        page.button(
-            actions,
+        actions.button(
             t("停止应急 DSH", "Stop emergency DSH"),
             false,
             () -> {
               controller.stop();
               main.post(refresh);
             });
-    actions.addView(
-        page.text(
-            t(
-                "需要更换临时密钥时，请先停止应急 DSH，再填写并重新启动。",
-                "To change the temporary key, stop emergency DSH, enter the key, then start it again."),
-            14,
-            R.color.text_secondary));
-    page.button(
-        actions,
+    actions.text(
+        t(
+            "需要更换临时密钥时，请先停止应急 DSH，再填写并重新启动。",
+            "To change the temporary key, stop emergency DSH, enter the key, then start it again."));
+    actions.arrow(
         t("查看原生诊断", "View native diagnostics"),
-        false,
+        "",
         () ->
             background(
                 () -> {
@@ -120,30 +98,24 @@ public final class RecoveryActivity extends AppCompatActivity {
                   String data = broker.diagnostics().toString(2);
                   ui(() -> showText(t("诊断结果", "Diagnostics"), data));
                 }));
-    operation = page.text("", 14, R.color.text_secondary);
-    operation.setTextIsSelectable(true);
-    page.content.addView(operation);
-    page.button(
-        actions, t("查看无需模型的修复选项", "Review repairs without a model"), false, this::repairOptions);
-    proposals = page.card();
+    actions.arrow(t("查看无需模型的修复选项", "Review repairs without a model"), "", this::repairOptions);
+    operation = model.note("");
+    proposals = model.section(t("修复提案", "Repair proposals"));
     renderPlans(new JSONArray());
-    LinearLayout tools = page.card();
-    page.button(
-        tools,
+    var tools = model.section(t("其他工具", "Other tools"));
+    tools.arrow(
         t("查看并下载错误日志", "View and export error logs"),
-        false,
+        "",
         () -> startActivity(DiagnosticActivity.downloadLogs(this)));
-    page.button(
-        tools,
+    tools.arrow(
         t("备份与保留数据", "Backups and retained data"),
-        false,
+        "",
         () -> startActivity(new Intent(this, NativeDataActivity.class)));
-    page.button(
-        tools,
+    tools.arrow(
         t("返回正式环境恢复页", "Return to regular environment recovery"),
-        false,
+        "",
         () -> startActivity(new Intent(this, ExtractActivity.class).putExtra("review_only", true)));
-    page.button(page.footer, t("返回", "Back"), false, this::finish);
+    setContentView(HyScreenKt.hyScreen(this, model, true));
   }
 
   private void ui(Runnable work) {
@@ -347,37 +319,25 @@ public final class RecoveryActivity extends AppCompatActivity {
   }
 
   private void renderPlans(JSONArray rows) {
-    proposals.removeAllViews();
-    TextView title = page.text(t("修复提案", "Repair proposals"), 17, R.color.text);
-    title.setTypeface(null, android.graphics.Typeface.BOLD);
-    proposals.addView(title);
+    proposals.clear();
     if (rows.length() == 0) {
-      proposals.addView(
-          page.text(
-              t(
-                  "应急 DSH 提出方案后在此查看和确认。尚未确认的提案不会修改正式数据。",
-                  "Review and confirm proposals here after emergency DSH creates them. Unconfirmed proposals do not change regular data."),
-              14,
-              R.color.text_secondary));
+      proposals.text(
+          t(
+              "应急 DSH 提出方案后在此查看和确认。尚未确认的提案不会修改正式数据。",
+              "Review and confirm proposals here after emergency DSH creates them. Unconfirmed proposals do not change regular data."));
       return;
     }
     for (int i = 0; i < rows.length(); i++) {
       JSONObject row = rows.optJSONObject(i);
       if (row == null) continue;
       String id = row.optString("id");
-      Button button =
-          page.button(
-              proposals,
-              row.optString("kind")
-                  + " · "
-                  + row.optString("targetId")
-                  + "\n"
-                  + statusLabel(row.optString("status")),
-              false,
+      HyLine entry =
+          proposals.arrow(
+              row.optString("kind") + " · " + row.optString("targetId"),
+              statusLabel(row.optString("status"))
+                  + (row.optString("reason").isEmpty() ? "" : "\n" + row.optString("reason")),
               () -> preview(id));
-      button.setEnabled(!applying);
-      String reason = row.optString("reason");
-      if (!reason.isEmpty()) proposals.addView(page.text(reason, 14, R.color.text_secondary));
+      entry.setEnabled(!applying);
     }
   }
 

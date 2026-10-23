@@ -20,7 +20,7 @@ public final class VirtualScreenActivity extends AppCompatActivity {
   private View packagePanel, textPanel;
   private ScrollView scroll;
   private View expandedPanel;
-  private SeekBar size;
+  private com.deepseekharness.app.ui.MiuixSlider size;
   private boolean busy;
   private volatile boolean visible;
   private long frameSeq = -1;
@@ -172,23 +172,17 @@ public final class VirtualScreenActivity extends AppCompatActivity {
     frame.setPadding(0, dp(4), 0, dp(4));
     frame.addView(preview, new FrameLayout.LayoutParams(-1, dp(initial)));
     root.addView(frame, new LinearLayout.LayoutParams(-1, dp(initial + 8)));
-    size = new SeekBar(this);
+    size = new com.deepseekharness.app.ui.MiuixSlider(this);
     size.setMax(100);
     size.setProgress(Math.round((initial - 280) * 100f / 440));
     size.setContentDescription(t("调整预览大小", "Adjust preview size"));
-    size.setOnSeekBarChangeListener(
-        new SeekBar.OnSeekBarChangeListener() {
-          public void onProgressChanged(SeekBar b, int v, boolean from) {
-            int h = 280 + Math.round(v * 4.4f);
-            frame.getLayoutParams().height = dp(h + 8);
-            frame.requestLayout();
-          }
-
-          public void onStartTrackingTouch(SeekBar b) {}
-
-          public void onStopTrackingTouch(SeekBar b) {}
+    size.setOnChangeListener(
+        (b, v, from) -> {
+          int h = 280 + Math.round(v * 4.4f);
+          frame.getLayoutParams().height = dp(h + 8);
+          frame.requestLayout();
         });
-    root.addView(size, new LinearLayout.LayoutParams(-1, dp(32)));
+    root.addView(size, new LinearLayout.LayoutParams(-1, -2));
     LinearLayout orientation = new LinearLayout(this);
     orientation.addView(
         button(t("创建竖屏", "Create portrait"), () -> create("portrait")),

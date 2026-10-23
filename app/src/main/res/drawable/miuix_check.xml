@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 勾选框和单选按钮共用的 miuix 圆形勾选。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@drawable/miuix_check_on" android:state_checked="true" />
+    <item android:drawable="@drawable/miuix_check_off" />
+</selector>

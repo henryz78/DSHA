@@ -12,7 +12,7 @@ import com.deepseekharness.app.R
 import com.deepseekharness.app.ui.compose.HydshTheme
 
 /** 设置首页：miuix 实现；子页面暂时沿用旧界面。 */
-class SettingsFragment : Fragment() {
+class SettingsFragment : Fragment(), OwnTopBar {
   override fun onCreateView(
     inflater: LayoutInflater,
     container: ViewGroup?,

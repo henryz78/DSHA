@@ -11,9 +11,9 @@ import com.deepseekharness.app.util.UiText;
 
 /** 自动计划、本机副本与原有恢复预检共用同一条数据路径。 */
 public final class AutomaticBackupActivity extends AppCompatActivity {
-  private CardPage page;
-  private TextView state;
-  private LinearLayout copies;
+  private HyScreenModel page;
+  private HyLine state;
+  private HyGroup copies;
   private boolean reading;
 
   private static String t(String zh, String en) {
@@ -49,34 +49,32 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
   }
 
   private void render() {
-    page =
-        new CardPage(
-            this,
-            t("自动备份", "Automatic backups"),
-            t(
-                "默认开启。备份对话、附件、配置和插件；不重复备份 Ubuntu。个人项目请使用手动备份。",
-                "On by default. Saves conversations, attachments, settings and plugins, without copying Ubuntu. Use manual backup for personal projects."));
-    UiNavigation.addHeader(this, page.root, t("自动备份", "Automatic backups"), this::finish);
+    page = new HyScreenModel(t("自动备份", "Automatic backups"));
+    page.note(
+        t(
+            "默认开启。备份对话、附件、配置和插件；不重复备份 Ubuntu。个人项目请使用手动备份。",
+            "On by default. Saves conversations, attachments, settings and plugins, without copying Ubuntu. Use manual backup for personal projects."));
     var prefs = AutomaticBackups.prefs(this);
-    LinearLayout settings = page.card();
-    var enabled = new com.google.android.material.materialswitch.MaterialSwitch(this);
-    enabled.setText(t("自动备份", "Automatic backups"));
-    enabled.setChecked(AutomaticBackups.enabled(this));
-    settings.addView(enabled);
-    enabled.setOnCheckedChangeListener(
-        (button, value) -> {
-          prefs.edit().putBoolean("enabled", value).commit();
-          AutomaticBackups.schedule(this);
-          refresh();
-        });
+    HyGroup settings = page.section("");
+    HyLine[] enabled = new HyLine[1];
+    enabled[0] =
+        settings.toggle(
+            t("自动备份", "Automatic backups"),
+            "",
+            AutomaticBackups.enabled(this),
+            value -> {
+              prefs.edit().putBoolean("enabled", value).commit();
+              enabled[0].setChecked(AutomaticBackups.enabled(this));
+              AutomaticBackups.schedule(this);
+              refresh();
+            });
     String mode = prefs.getString("mode", "daily");
     String[] names = {
       t("每天指定时间", "Daily at a chosen time"),
       t("每隔一段时间", "At an interval"),
       t("停止 DSH 后", "After stopping DSH")
     };
-    page.entry(
-        settings,
+    settings.arrow(
         t("备份时机", "Backup timing"),
         names["interval".equals(mode) ? 1 : "stop".equals(mode) ? 2 : 0],
         R.drawable.ic_ui2_box,
@@ -95,8 +93,7 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                 }));
     if ("daily".equals(mode)) {
       int minute = prefs.getInt("minute", 180);
-      page.entry(
-          settings,
+      settings.arrow(
           t("每天时间", "Daily time"),
           String.format(java.util.Locale.ROOT, "%02d:%02d", minute / 60, minute % 60),
           R.drawable.ic_ui2_box,
@@ -112,8 +109,7 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                       true)
                   .show());
     } else if ("interval".equals(mode)) {
-      page.entry(
-          settings,
+      settings.arrow(
           t("间隔小时", "Interval in hours"),
           String.valueOf(prefs.getInt("hours", 24)),
           R.drawable.ic_ui2_box,
@@ -147,27 +143,17 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
             dialog.show();
           });
     }
-    settings.addView(
-        page.text(
+    settings.text(
             t(
                 "到期时仍在运行则延后，不会停止对话或终端。时间由系统调度，可能略有延迟。保留最近 3 份已验证自动副本。关闭后取消后续任务，已有副本保留。",
-                "If DSH or a terminal is running, backup waits. Android scheduling may delay the selected time. Keeps the latest 3 verified automatic copies. Turning off cancels future jobs and preserves existing copies."),
-            12,
-            R.color.text_secondary));
-    TextView localHint =
-        page.text(
+                "If DSH or a terminal is running, backup waits. Android scheduling may delay the selected time. Keeps the latest 3 verified automatic copies. Turning off cancels future jobs and preserves existing copies."));
+    settings.text(
             t(
                 "自动副本与本机密钥在卸载时会清除。换机或卸载前，请导出无需密码的 tar.gz 并保存到应用外。",
-                "Local copies and their device key are removed when the app is uninstalled. Export a tar.gz without a password and save it outside the app before moving or uninstalling."),
-            11,
-            R.color.text_muted);
-    localHint.setPadding(0, page.dp(10), 0, 0);
-    settings.addView(localHint);
-    state = page.text("", 12, R.color.text_secondary);
-    page.content.addView(state);
-    copies = page.card();
+                "Local copies and their device key are removed when the app is uninstalled. Export a tar.gz without a password and save it outside the app before moving or uninstalling."));
+    state = page.note("");
+    copies = page.section(t("自动副本", "Automatic copies"));
     page.button(
-        page.footer,
         t("现在创建自动备份", "Create automatic backup now"),
         true,
         () -> {
@@ -185,8 +171,8 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                   "已安排：DSH 和终端停止后可执行，稍后刷新查看结果。",
                   "Scheduled. DSH and terminals must be stopped. Refresh shortly to view the result."));
         });
-    page.button(page.footer, t("刷新备份记录", "Refresh backup records"), false, this::refresh);
-    setContentView(page.root);
+    page.button(t("刷新备份记录", "Refresh backup records"), false, this::refresh);
+    setContentView(HyScreenKt.hyScreen(this, page, true));
     refresh();
   }
 
@@ -205,7 +191,7 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                     () -> {
                       reading = false;
                       if (isFinishing() || isDestroyed()) return;
-                      copies.removeAllViews();
+                      copies.clear();
                       String status =
                           AutomaticBackups.enabled(this)
                               ? t(
@@ -238,8 +224,7 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                           String title =
                               android.text.format.DateFormat.format("MM-dd HH:mm", copy.created)
                                   .toString();
-                          page.entry(
-                              copies,
+                          copies.arrow(
                               title,
                               com.deepseekharness.app.util.Fmt.bytes(copy.bytes)
                                   + ("DATA_SAVED_PLUGIN_WARNINGS".equals(copy.result(true))
@@ -263,14 +248,11 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
                                                           : "auto_export_id",
                                                       copy.id))));
                         }
-                      if (copies.getChildCount() == 0)
-                        copies.addView(
-                            page.text(
-                                t(
-                                    "还没有自动备份。到达所选时间后，在 DSH 停止且没有终端任务时创建第一份。",
-                                    "No automatic backup yet. The first copy is created when due, with DSH and terminals stopped."),
-                                12,
-                                R.color.text_muted));
+                      if (copies.getRows().isEmpty())
+                        copies.text(
+                            t(
+                                "还没有自动备份。到达所选时间后，在 DSH 停止且没有终端任务时创建第一份。",
+                                "No automatic backup yet. The first copy is created when due, with DSH and terminals stopped."));
                     });
               } catch (Exception error) {
                 runOnUiThread(

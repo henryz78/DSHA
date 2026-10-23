@@ -22,9 +22,9 @@ public class ExtractActivity extends AppCompatActivity {
   private final Handler main = new Handler(Looper.getMainLooper());
   private BackupTask task;
   private HarnessController controller;
-  private TextView status, detail, error;
-  private ProgressBar spinner, progress;
-  private Button retry, enter;
+  private HyLine status, detail, error, progress;
+  private HyLine retry, enter;
+  private Runnable retryAction = () -> {};
   private long taskId;
   private boolean automaticEntry;
   private boolean automaticDeclined;
@@ -39,7 +39,6 @@ public class ExtractActivity extends AppCompatActivity {
   @Override
   protected void onCreate(@Nullable Bundle saved) {
     super.onCreate(saved);
-    setContentView(R.layout.activity_extract);
     controller = HarnessController.get(this);
     task = BackupTask.get(this);
     rebuildRequested =
@@ -48,41 +47,29 @@ public class ExtractActivity extends AppCompatActivity {
             : getIntent().getBooleanExtra("force_extract", false)
                 || com.deepseekharness.app.util.BackupTaskKinds.is(
                     com.deepseekharness.app.util.BackupTaskKinds.REBUILD, task.snapshot().kind);
-    status = findViewById(R.id.extract_status);
-    detail = findViewById(R.id.extract_detail);
-    error = findViewById(R.id.extract_error);
-    spinner = findViewById(R.id.extract_bar);
-    progress = findViewById(R.id.extract_progress);
-    ((TextView) findViewById(R.id.extract_title))
-        .setText(com.deepseekharness.app.util.UiText.text("运行环境维护"));
-    LinearLayout content = findViewById(R.id.extract_actions);
-    retry = new androidx.appcompat.widget.AppCompatButton(this);
-    enter = new androidx.appcompat.widget.AppCompatButton(this);
-    retry.setBackgroundResource(R.drawable.bg_btn_primary);
-    retry.setTextColor(getColorStateList(R.color.button_primary_text));
-    retry.setTextSize(14);
-    retry.setAllCaps(false);
-    enter.setBackgroundResource(R.drawable.bg_action_plain);
-    enter.setTextColor(getColor(R.color.primary));
-    enter.setTextSize(13);
-    enter.setAllCaps(false);
-    content.addView(retry, new LinearLayout.LayoutParams(-1, -2));
-    content.addView(enter, new LinearLayout.LayoutParams(-1, -2));
-    Button emergency = new androidx.appcompat.widget.AppCompatButton(this);
-    emergency.setText(
-        com.deepseekharness.app.util.UiText.choose("启动应急 DSH", "Start emergency DSH"));
-    emergency.setBackgroundResource(R.drawable.bg_btn);
-    emergency.setTextColor(getColorStateList(R.color.button_text));
-    emergency.setTextSize(15);
-    emergency.setAllCaps(false);
-    emergency.setOnClickListener(v -> startActivity(new Intent(this, RecoveryActivity.class)));
-    content.addView(emergency, new LinearLayout.LayoutParams(-1, -2));
-    Button logs = new androidx.appcompat.widget.AppCompatButton(this);
-    logs.setText(com.deepseekharness.app.util.UiText.choose("查看本次维护记录", "View maintenance record"));
-    logs.setOnClickListener(v -> startActivity(DiagnosticActivity.downloadLogs(this)));
-    content.addView(logs, new LinearLayout.LayoutParams(-1, -2));
-    retry.setOnClickListener(
-        v -> {
+    var model = new HyScreenModel(com.deepseekharness.app.util.UiText.text("运行环境维护"));
+    var state = model.section("");
+    status = state.kv("", "");
+    progress = state.progress();
+    detail = state.selectable("");
+    error = state.text("");
+    error.setTone(2);
+    retry = model.button("", true, () -> retryAction.run());
+    enter = model.button(com.deepseekharness.app.util.UiText.text("进入主界面"), false, this::proceed);
+    var tools = model.section(com.deepseekharness.app.util.UiText.choose("其他工具", "Other tools"));
+    tools.arrow(
+        com.deepseekharness.app.util.UiText.choose("启动应急 DSH", "Start emergency DSH"),
+        "",
+        R.drawable.ic_ui_shield,
+        () -> startActivity(new Intent(this, RecoveryActivity.class)));
+    tools.arrow(
+        com.deepseekharness.app.util.UiText.choose("查看本次维护记录", "View maintenance record"),
+        "",
+        R.drawable.ic_recovery_document,
+        () -> startActivity(DiagnosticActivity.downloadLogs(this)));
+    setContentView(HyScreenKt.hyScreen(this, model, false));
+    retryAction =
+        () -> {
           boolean recovery = task.pendingMaintenance();
           boolean update = !rebuildRequested && controller.proot().canUpdateManagedRuntime();
           new com.deepseekharness.app.ui.DshaDialogBuilder(this, true)
@@ -113,9 +100,7 @@ public class ExtractActivity extends AppCompatActivity {
                   })
               .setNegativeButton(com.deepseekharness.app.util.UiText.text("取消"), null)
               .show();
-        });
-    enter.setText(com.deepseekharness.app.util.UiText.text("进入主界面"));
-    enter.setOnClickListener(v -> proceed());
+        };
     taskId =
         saved == null
             ? getIntent().getLongExtra("data_task_id", 0)
@@ -204,11 +189,7 @@ public class ExtractActivity extends AppCompatActivity {
     lastRender = renderKey;
     if (busy) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-    spinner.setVisibility(busy ? View.VISIBLE : View.GONE);
-    progress.setVisibility(busy ? View.VISIBLE : View.GONE);
-    progress.setIndeterminate(true);
-    ((TextView) findViewById(R.id.extract_title))
-        .setText(com.deepseekharness.app.util.UiText.text("运行环境维护"));
+    progress.setVisible(busy);
     status.setText(
         busy
             ? com.deepseekharness.app.util.UiStateText.render(s.kind)
@@ -216,7 +197,6 @@ public class ExtractActivity extends AppCompatActivity {
                 ? com.deepseekharness.app.util.UiText.text("上次维护未完成，请先恢复原环境")
                 : com.deepseekharness.app.util.UiText.text("环境维护"));
     boolean mine = taskId != 0 && taskId == s.id;
-    detail.setVisibility(View.VISIBLE);
     detail.setText(
         mine
             ? com.deepseekharness.app.util.MaintenanceErrorText.render(s.detail)
@@ -238,7 +218,7 @@ public class ExtractActivity extends AppCompatActivity {
                       com.deepseekharness.app.util.UiStateText.render(s.lastStage), 240),
               com.deepseekharness.app.util.MaintenanceErrorText.render(s.detail)));
     boolean incomplete = mine && s.status == BackupTaskState.Status.SUCCEEDED && !ready;
-    error.setVisibility(failed || incomplete || automaticDeclined ? View.VISIBLE : View.GONE);
+    error.setVisible(failed || incomplete || automaticDeclined);
     error.setText(
         incomplete
             ? com.deepseekharness.app.util.UiText.choose(
@@ -327,4 +307,5 @@ public class ExtractActivity extends AppCompatActivity {
     main.removeCallbacks(refresh);
     super.onPause();
   }
+
 }

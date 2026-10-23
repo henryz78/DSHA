@@ -17,10 +17,11 @@ import java.util.*;
 public final class StartupRecoveryActivity extends AppCompatActivity {
   private HarnessController controller;
   private StartupRecoveryModel model;
-  private LinearLayout content, attempts, snapshots, plugins;
-  private TextView progress;
+  private HyGroup attempts, snapshots, plugins;
+  private HyLine progress;
   private StartupRecoveryLayout layout;
-  private final List<View> actions = new ArrayList<>();
+  private final List<HyLine> actions = new ArrayList<>();
+  private final List<HyLine> dynamicActions = new ArrayList<>();
   private final android.os.Handler ui = new android.os.Handler(android.os.Looper.getMainLooper());
   private String previousTask = "";
   private String shownReadError = "";
@@ -43,7 +44,6 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
     if (reason.isEmpty()) reason = controller.startupDiagnostics().snapshot().stage;
     layout = new StartupRecoveryLayout(this, StartupText.render(reason), () -> finish());
     setContentView(layout.root);
-    content = layout.content;
     attempts = layout.attempts;
     snapshots = layout.snapshots;
     plugins = layout.plugins;
@@ -143,7 +143,7 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
             status(shownReadError);
           } else if (value != null && !shownReadError.isEmpty()) {
             // A later task result owns its own message; clear only this read's stale error.
-            if (shownReadError.contentEquals(progress.getText())) status("");
+            if (shownReadError.equals(progress.getText())) status("");
             shownReadError = "";
           }
           renderAttempts();
@@ -151,23 +151,25 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
     if (model.contents.getValue() == null) model.load();
   }
 
-  private TextView label(LinearLayout parent, String text) {
+  private HyLine label(HyGroup parent, String text) {
     return layout.label(parent, text, 13, R.color.text_muted);
   }
 
   private void action(
-      LinearLayout parent, String text, int icon, Runnable click, boolean protectedAction) {
-    View row = layout.action(parent, text, icon, click, true);
+      HyGroup parent, String text, int icon, Runnable click, boolean protectedAction) {
+    HyLine row = layout.action(parent, text, icon, click, true);
     if (protectedAction) actions.add(row);
   }
 
-  private void button(LinearLayout parent, String text, Runnable click, boolean protectedAction) {
-    action(parent, text, 0, click, protectedAction);
+  /** 快照、插件这类会随数据刷新的行：每次重绘都会清掉重建。 */
+  private void button(HyGroup parent, String text, Runnable click, boolean protectedAction) {
+    HyLine row = layout.action(parent, text, 0, click, true);
+    if (protectedAction) dynamicActions.add(row);
   }
 
   private void status(String text) {
     progress.setText(text);
-    progress.setVisibility(text.isEmpty() ? View.GONE : View.VISIBLE);
+    progress.setVisible(!text.isEmpty());
   }
 
   private int dp(int value) {
@@ -256,7 +258,7 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
 
   private void renderAttempts() {
     if (attempts == null) return;
-    attempts.removeAllViews();
+    attempts.clear();
     for (StartupHistoryStore.Entry entry : model.attempts) {
       String status =
           "ready".equals(entry.status)
@@ -287,8 +289,7 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
           false);
     }
     if (model.attempts.isEmpty()) {
-      TextView empty =
-          label(
+      label(
               attempts,
               controller.startupDiagnostics().historyError().isEmpty()
                   ? t(
@@ -296,15 +297,15 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
                       "No startup records yet. The next start will be recorded automatically.")
                   : t("启动记录暂不可用：", "Startup records are currently unavailable: ")
                       + controller.startupDiagnostics().historyError());
-      empty.setPadding(dp(36), dp(2), 0, dp(2));
     }
   }
 
   private void render(JSONObject value) {
     renderAttempts();
-    snapshots.removeAllViews();
-    plugins.removeAllViews();
-    actions.removeIf(view -> view.getParent() == null);
+    // 保留快照分组开头的说明，其余行重建。
+    while (snapshots.getRows().size() > 1) snapshots.getRows().remove(snapshots.getRows().size() - 1);
+    plugins.clear();
+    dynamicActions.clear();
     JSONArray records = value.optJSONArray("snapshots");
     if (records != null)
       for (int i = 0; i < records.length(); i++) {
@@ -377,8 +378,6 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
                     }),
             true);
       }
-    layout.pluginCard.setVisibility(
-        count > 0 || !value.optString("pluginError").isEmpty() ? View.VISIBLE : View.GONE);
     if (!value.optString("pluginError").isEmpty())
       label(
           plugins,
@@ -436,7 +435,8 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
           if (wasBusy && !maintenance) model.load();
           wasBusy = maintenance;
           model.retryWhenIdle();
-          for (View action : actions) StartupRecoveryLayout.enabled(action, !busy);
+          for (HyLine action : actions) StartupRecoveryLayout.enabled(action, !busy);
+          for (HyLine action : dynamicActions) StartupRecoveryLayout.enabled(action, !busy);
           ui.removeCallbacks(this);
           ui.postDelayed(this, 700);
         }

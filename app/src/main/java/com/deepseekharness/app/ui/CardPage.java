@@ -11,9 +11,12 @@ final class CardPage {
   final Context context;
   final LinearLayout root, content, footer;
   final ScrollView scroll;
+  final TextView heading;
+  private final String title;
 
   CardPage(Context context, String title, String subtitle) {
     this.context = context;
+    this.title = title;
     root = column();
     root.setBackgroundColor(context.getColor(R.color.surface));
     scroll = new ScrollView(context);
@@ -22,7 +25,7 @@ final class CardPage {
     content.setPadding(dp(12), dp(12), dp(12), dp(24));
     scroll.addView(content);
     root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-    TextView heading = text(title, 26, R.color.text);
+    heading = text(title, 26, R.color.text);
     heading.setTypeface(null, android.graphics.Typeface.BOLD);
     heading.setPadding(dp(16), dp(8), dp(16), dp(subtitle.isEmpty() ? 16 : 0));
     content.addView(heading);
@@ -35,6 +38,17 @@ final class CardPage {
     footer = column();
     footer.setPadding(dp(12), dp(8), dp(12), dp(12));
     root.addView(footer);
+  }
+
+  /** 独立页面：顶部换成 miuix 顶栏（返回 + 居中标题），去掉正文里重复的大标题。 */
+  void topBar(Runnable back) {
+    noHeading();
+    root.addView(PageBarKt.pageBar(context, title, back), 0);
+  }
+
+  /** 主界面里的子页面已有顶栏标题，正文不再重复。 */
+  void noHeading() {
+    heading.setVisibility(View.GONE);
   }
 
   int dp(int n) {
@@ -114,20 +128,16 @@ final class CardPage {
     card.addView(row);
   }
 
-  Button button(LinearLayout parent, String title, boolean primary, Runnable action) {
-    var button = new androidx.appcompat.widget.AppCompatButton(context);
+  /** miuix 按钮；primary 为主色。按钮自带上下 4dp 留白，这里只再补 4dp。 */
+  MiuixButton button(LinearLayout parent, String title, boolean primary, Runnable action) {
+    MiuixButton button = new MiuixButton(context);
     button.setText(title);
-    button.setTextSize(16);
-    button.setAllCaps(false);
-    button.setStateListAnimator(null);
-    button.setMinHeight(dp(52));
-    button.setBackgroundResource(primary ? R.drawable.bg_btn_primary : R.drawable.bg_btn);
-    button.setTextColor(
-        context.getColorStateList(primary ? R.color.button_primary_text : R.color.button_text));
+    button.setPrimary(primary);
     button.setOnClickListener(v -> action.run());
     LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(-1, -2);
-    p.topMargin = dp(12);
+    p.topMargin = dp(4);
     parent.addView(button, p);
     return button;
   }
+
 }

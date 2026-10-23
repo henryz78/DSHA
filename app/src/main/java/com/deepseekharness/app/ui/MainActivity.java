@@ -48,6 +48,12 @@ public class MainActivity extends AppCompatActivity {
 
   /** miuix 顶栏与底部标签；主界面就绪前为 null。 */
   private MainChrome chrome;
+  /** 四个主标签页（ViewPager2）；子页面叠在 fragment_container 里。 */
+  private MainPages pages;
+  private androidx.viewpager2.widget.ViewPager2 pager;
+  /** 外部要求打开“已安装插件”时，插件页还没建好就先记着。 */
+  private boolean pendingInstalled;
+  private int shownStack;
 
   private int selectedTab = R.id.nav_launch;
 
@@ -255,8 +261,19 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.app_bar),
         () -> getOnBackPressedDispatcher().onBackPressed(),
         () -> BackgroundTasksActivity.open(this));
-    chrome.attachBottomBar(findViewById(R.id.bottom_nav), this::selectTab);
+    pager = findViewById(R.id.main_pager);
+    pages = new MainPages(this, this::tabKind, this::createTab);
+    pages.attach(pager);
+    GlassBar.load(this);
+    GlassBar.setSource(findViewById(R.id.content_frame));
+    chrome.attachBottomBar(findViewById(R.id.bottom_nav), this::selectTab, this::applyBarInset);
+    findViewById(R.id.bottom_nav)
+        .addOnLayoutChangeListener(
+            (v, l, t, r, b, ol, ot, or, ob) -> {
+              if (b - t != ob - ot) v.post(this::applyBarInset);
+            });
     getSupportFragmentManager().addOnBackStackChangedListener(this::updateToolbar);
+    getSupportFragmentManager().addOnBackStackChangedListener(this::movePagerForSubpage);
     getSupportFragmentManager()
         .registerFragmentLifecycleCallbacks(
             new androidx.fragment.app.FragmentManager.FragmentLifecycleCallbacks() {
@@ -294,62 +311,118 @@ public class MainActivity extends AppCompatActivity {
 
   /** 切换底部标签。原 BottomNavigationView 监听器的逻辑，原样搬过来。 */
   private void selectTab(int id) {
-    if (chrome == null) return;
-    // 当前根页面再次点选时保留输入和滚动；从子页返回或外部打开插件仍执行导航。
-    if (selectedTab == id
-        && getSupportFragmentManager().getBackStackEntryCount() == 0
-        && getSupportFragmentManager().findFragmentById(R.id.fragment_container) != null
-        && !(getSupportFragmentManager().findFragmentById(R.id.fragment_container)
-            instanceof EnvironmentRecoveryFragment)
-        && !getIntent().getBooleanExtra("open_plugins", false)) return;
+    if (chrome == null || pages == null) return;
     selectedTab = id;
     chrome.setTab(id);
     if (!getSupportFragmentManager().isStateSaved())
       getSupportFragmentManager()
           .popBackStackImmediate(null, androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
-    HarnessController controller = HarnessController.get(this);
-    Fragment f;
-    if (id == R.id.nav_launch) {
-      f = new LaunchFragment();
+    // 环境需要修复、或终端类型改了时，对应页面换成新的。
+    pages.refresh();
+    if (id == R.id.nav_plugins && getIntent().getBooleanExtra("open_plugins", false)) {
+      getIntent().removeExtra("open_plugins");
+      Fragment plugins = tabFragment(1);
+      if (plugins instanceof PluginFragment) ((PluginFragment) plugins).showInstalled();
+      else pendingInstalled = true;
+    }
+    pages.slide(pager, MainPages.index(id));
+    applyBarInset();
+  }
+
+  /** 某个标签页的种类：插件页 0 正常 / 1 修复；终端页 0 PTY / 1 简易 / 2 修复。 */
+  private int tabKind(int position) {
+    boolean recovery =
+        com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(HarnessController.get(this));
+    if (position == 1) return recovery ? 1 : 0;
+    if (position == 3) return recovery ? 2 : PtyTerminalFragment.preferred(this) ? 0 : 1;
+    return 0;
+  }
+
+  /** 翻页器需要某一页时才创建（原 selectTab 里的建页逻辑）。 */
+  private Fragment createTab(int position) {
+    boolean recovery =
+        com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(HarnessController.get(this));
+    if (position == 0) {
+      Fragment f = new LaunchFragment();
       if (pendingOpenWeb) {
         pendingOpenWeb = false;
         Bundle args = new Bundle();
         args.putBoolean(LaunchFragment.ARG_OPEN_WEB, true);
         f.setArguments(args);
       }
-    } else if (id == R.id.nav_plugins) {
-      f =
-          com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
-              ? new EnvironmentRecoveryFragment()
-              : new PluginFragment();
-      if (getIntent().getBooleanExtra("open_plugins", false)) {
+      return f;
+    }
+    if (position == 1) {
+      if (recovery) return new EnvironmentRecoveryFragment();
+      Fragment f = new PluginFragment();
+      if (pendingInstalled) {
+        pendingInstalled = false;
         Bundle args = new Bundle();
         args.putBoolean("show_installed", true);
         f.setArguments(args);
-        getIntent().removeExtra("open_plugins");
       }
-    } else if (id == R.id.nav_settings) {
-      f = new SettingsFragment();
-    } else {
-      // 终端：默认挂真 PTY 页（vim/htop/tmux 能跑），可在 PTY 页切回简易版
-      f =
-          com.deepseekharness.app.core.EnvironmentAccess.needsRecovery(controller)
-              ? new EnvironmentRecoveryFragment()
-              : PtyTerminalFragment.preferred(this)
-                  ? new PtyTerminalFragment()
-                  : new TerminalFragment();
+      return f;
     }
-    UiMotion.page(this, getSupportFragmentManager().beginTransaction())
-        .replace(R.id.fragment_container, f)
-        .commit();
+    if (position == 2) return new SettingsFragment();
+    // 终端：默认挂真 PTY 页（vim/htop/tmux 能跑），可在 PTY 页切回简易版
+    if (recovery) return new EnvironmentRecoveryFragment();
+    return PtyTerminalFragment.preferred(this) ? new PtyTerminalFragment() : new TerminalFragment();
+  }
+
+  /** 终端页在 PTY 与简易版之间切换后调用。 */
+  void refreshTabs() {
+    if (pages != null) pages.refresh();
+  }
+
+  @androidx.annotation.Nullable
+  private Fragment tabFragment(int position) {
+    return pages == null
+        ? null
+        : getSupportFragmentManager().findFragmentByTag(pages.tag(position));
+  }
+
+  /** 当前看到的页面：有子页面时是最上层的子页面，否则是选中的标签页。 */
+  @androidx.annotation.Nullable
+  private Fragment shownFragment() {
+    Fragment top = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+    return top != null ? top : tabFragment(MainPages.index(selectedTab));
+  }
+
+  /** 打开子页面时标签页向左让出一小段并变暗，返回时复原（和子页面之间的推入动画一致）。 */
+  private void movePagerForSubpage() {
+    if (pager == null) return;
+    int count = getSupportFragmentManager().getBackStackEntryCount();
+    boolean covered = count > 0;
+    boolean was = shownStack > 0;
+    shownStack = count;
+    if (covered == was) return;
+    float x = covered ? -0.25f * pager.getWidth() : 0f;
+    float alpha = covered ? 0.6f : 1f;
+    if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
+      pager.setTranslationX(x);
+      pager.setAlpha(alpha);
+      return;
+    }
+    pager
+        .animate()
+        .translationX(x)
+        .alpha(alpha)
+        .setDuration(380)
+        .setInterpolator(new android.view.animation.DecelerateInterpolator(1.5f))
+        .start();
   }
 
   private void releaseGatedPages(boolean allowed) {
     if (allowed && !gatedPages.isEmpty()) {
       var resume = getSupportFragmentManager().beginTransaction();
+      String current = pages == null ? null : pages.tag(MainPages.index(selectedTab));
       for (Fragment page : gatedPages)
         if (page.isAdded())
-          resume.setMaxLifecycle(page, androidx.lifecycle.Lifecycle.State.RESUMED);
+          resume.setMaxLifecycle(
+              page,
+              page.getTag() != null && page.getTag().startsWith("f") && !page.getTag().equals(current)
+                  ? androidx.lifecycle.Lifecycle.State.STARTED
+                  : androidx.lifecycle.Lifecycle.State.RESUMED);
       resume.commitNow();
     }
     gatedPages.clear();
@@ -490,23 +563,45 @@ public class MainActivity extends AppCompatActivity {
     intent.removeExtra("open_web");
     if (chrome == null) return;
     pendingOpenWeb = true;
-    if (selectedTab != R.id.nav_launch) {
-      selectTab(R.id.nav_launch);
-      return;
-    }
-    // 已经停在启动页（通知点击时 App 可能就在启动页）：不会触发监听器，
-    // 直接把意图交给当前这个 LaunchFragment；没有就等下次创建。
+    if (selectedTab != R.id.nav_launch) selectTab(R.id.nav_launch);
+    // 启动页已经建好时直接把意图交给它；还没建就等创建时通过参数带进去。
     getSupportFragmentManager().executePendingTransactions();
-    Fragment shown = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+    Fragment shown = tabFragment(0);
     if (shown instanceof LaunchFragment) {
       pendingOpenWeb = false;
       ((LaunchFragment) shown).requestAutoEnterWeb();
     }
   }
 
+  /**
+   * 经典底栏：页面整体停在底栏上方。玻璃底栏：页面铺到底栏后面，列表末尾留出底栏高度，
+   * 终端页自己在底部让出底栏高度。留白不随页面变化，切标签时布局不会跳。
+   */
+  private void applyBarInset() {
+    android.view.View bar = findViewById(R.id.bottom_nav);
+    BackdropSourceLayout frame = findViewById(R.id.content_frame);
+    if (bar == null || frame == null) return;
+    findViewById(R.id.app_bar)
+        .setVisibility(
+            // 四个标签页都自带标题；页面还没建好（null）时也不显示，否则切页时会闪出旧标题栏。
+            shownFragment() == null || shownFragment() instanceof OwnTopBar
+                ? android.view.View.GONE
+                : android.view.View.VISIBLE);
+    boolean glass = GlassBar.INSTANCE.getEnabled();
+    int height = bar.getVisibility() == android.view.View.VISIBLE ? bar.getHeight() : 0;
+    frame.setCapture(glass);
+    int pad = glass ? 0 : height;
+    if (frame.getPaddingBottom() != pad) frame.setPadding(0, 0, 0, pad);
+    GlassBar.setContentBottomPx(glass ? height : 0);
+    for (Fragment page : getSupportFragmentManager().getFragments())
+      if ((page instanceof PtyTerminalFragment || page instanceof TerminalFragment)
+          && page.getView() != null) GlassBar.padTerminal(page.getView());
+  }
+
   private void updateToolbar() {
     if (chrome == null) return;
-    Fragment shown = getSupportFragmentManager().findFragmentById(R.id.fragment_container);
+    Fragment shown = shownFragment();
+    applyBarInset();
     chrome.setBack(getSupportFragmentManager().getBackStackEntryCount() > 0);
     String title;
     if (shown instanceof AboutFragment) title = com.deepseekharness.app.util.UiText.choose("关于", "About");
@@ -540,6 +635,8 @@ public class MainActivity extends AppCompatActivity {
       return;
     }
     BrowserTasks.rememberMain(this);
+    // 从修复页等处回来时，环境状态可能变了：插件/终端页换成对应的页面。
+    refreshTabs();
     if (!new ConfigStore(this)
         .getUiLanguage()
         .equals(com.deepseekharness.app.util.UiText.language())) LanguageController.apply(this);
@@ -763,7 +860,7 @@ public class MainActivity extends AppCompatActivity {
               && !controller.isStopping()
               && startupRecoveryDestination(
                   selectedTab,
-                  getSupportFragmentManager().findFragmentById(R.id.fragment_container))
+                  shownFragment())
               && !key.equals(openedRecovery)
               && getLifecycle()
                   .getCurrentState()
@@ -785,6 +882,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onDestroy() {
     entryGate.cancel();
+    if (GlassBar.getSource() == findViewById(R.id.content_frame)) GlassBar.setSource(null);
     // 主题切换/旋转只重建界面，不能把正在运行的终端一起关闭。
     if (!discardedLauncherEntry && !isChangingConfigurations()) {
       try {

@@ -10,6 +10,10 @@ import com.deepseekharness.app.R;
 final class CardSheet {
   static androidx.appcompat.app.AlertDialog create(Context context, CardPage page) {
     page.root.setBackgroundResource(R.drawable.bg_card);
+    // 和普通弹窗一致：标题居中、字号适中。
+    page.heading.setTextSize(19);
+    page.heading.setGravity(Gravity.CENTER);
+    page.heading.setPadding(page.dp(16), page.dp(12), page.dp(16), page.dp(8));
     page.scroll.setFillViewport(false);
     page.scroll.setLayoutParams(new LinearLayout.LayoutParams(-1, -2, 1));
     FrameLayout container =

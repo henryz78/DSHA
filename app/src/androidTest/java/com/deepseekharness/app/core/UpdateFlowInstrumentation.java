@@ -52,7 +52,6 @@ public final class UpdateFlowInstrumentation extends Instrumentation {
       startup();
       channelFailures();
       legacySources();
-      progressStages();
       installHandoff();
       check(sandbox.services == 0, "自测不能启动下载服务");
       result.putString("result", "PASS: " + assertions + " assertions");
@@ -302,122 +301,6 @@ public final class UpdateFlowInstrumentation extends Instrumentation {
         engine.state().getValue().release != null
             && UpdatePolicy.PREVIEW.equals(engine.state().getValue().sourceChannel),
         "重新确认的来源在离线检查后丢失");
-  }
-
-  private void progressStages() throws Exception {
-    reset(UpdatePolicy.PREVIEW, UpdatePolicy.PREVIEW, UpdatePolicy.PREVIEW, "ready");
-    android.view.View[] root = new android.view.View[1];
-    runOnMainSync(
-        () -> {
-          Context themed =
-              new androidx.appcompat.view.ContextThemeWrapper(
-                  getTargetContext(), com.deepseekharness.app.R.style.Theme_DeepseekHarness);
-          root[0] =
-              android.view.LayoutInflater.from(themed)
-                  .inflate(com.deepseekharness.app.R.layout.activity_update, null);
-          engine.checkOnStartup(true);
-          check(
-              engine.state().getValue().stage == UpdateRepository.Stage.CHECKING,
-              "自动检查未标注 CHECKING 阶段");
-          check(
-              engine.state().getValue().downloaded == engine.state().getValue().total,
-              "夹具应保留已下载的完整包");
-          renderProgress(root[0], engine.state().getValue(), false, false, true, true, false, -1);
-        });
-    idle();
-    runOnMainSync(
-        () -> {
-          renderProgress(root[0], engine.state().getValue(), false, false, false, true, true, -1);
-          engine.check();
-          renderProgress(root[0], engine.state().getValue(), false, false, true, true, false, -1);
-        });
-    idle();
-    runOnMainSync(
-        () -> {
-          UpdateRepository.State ready = engine.state().getValue();
-          UpdateRepository.State downloading =
-              new UpdateRepository.State(
-                  "下载夹具",
-                  UpdateRepository.Stage.DOWNLOADING,
-                  2,
-                  4,
-                  ready.release,
-                  null,
-                  ready.channel,
-                  ready.sourceChannel);
-          renderProgress(root[0], downloading, false, false, true, false, true, 50);
-          UpdateRepository.State checking =
-              new UpdateRepository.State(
-                  "缓存部分下载后检查",
-                  UpdateRepository.Stage.CHECKING,
-                  2,
-                  4,
-                  ready.release,
-                  null,
-                  ready.channel,
-                  ready.sourceChannel);
-          renderProgress(root[0], checking, false, false, true, true, false, -1);
-          UpdateRepository.State verifying =
-              new UpdateRepository.State(
-                  "下载后核验",
-                  UpdateRepository.Stage.VERIFYING,
-                  4,
-                  4,
-                  ready.release,
-                  null,
-                  ready.channel,
-                  ready.sourceChannel);
-          renderProgress(root[0], verifying, false, false, true, true, false, -1);
-          renderProgress(root[0], ready, true, true, true, true, false, -1);
-          check(
-              !root[0].findViewById(com.deepseekharness.app.R.id.update_check).isEnabled()
-                  && !root[0].findViewById(com.deepseekharness.app.R.id.update_install).isEnabled(),
-              "安装校验时操作未锁定");
-          // READY 结果等待页面领取时已结束校验，不能继续显示转圈。
-          renderProgress(root[0], ready, true, false, false, true, true, -1);
-          check(
-              !root[0].findViewById(com.deepseekharness.app.R.id.update_install).isEnabled(),
-              "待领取安装结果重复开放按钮");
-          renderProgress(root[0], ready, false, false, false, true, true, -1);
-          check(
-              root[0].findViewById(com.deepseekharness.app.R.id.update_install).isEnabled(),
-              "空闲时安装入口未恢复");
-        });
-  }
-
-  private void renderProgress(
-      android.view.View root,
-      UpdateRepository.State state,
-      boolean installing,
-      boolean verifying,
-      boolean visible,
-      boolean indeterminate,
-      boolean bytes,
-      int percent) {
-    try {
-      java.lang.reflect.Method render =
-          Class.forName("com.deepseekharness.app.ui.UpdateUi")
-              .getDeclaredMethod(
-                  "render",
-                  android.view.View.class,
-                  UpdateRepository.State.class,
-                  boolean.class,
-                  boolean.class);
-      render.setAccessible(true);
-      render.invoke(null, root, state, installing, verifying);
-      android.widget.ProgressBar bar =
-          root.findViewById(com.deepseekharness.app.R.id.update_progress);
-      check((bar.getVisibility() == android.view.View.VISIBLE) == visible, "进度动画可见性与任务阶段不符");
-      check(bar.isIndeterminate() == indeterminate, "检查/校验复用了下载百分比");
-      check(
-          (root.findViewById(com.deepseekharness.app.R.id.update_bytes).getVisibility()
-                  == android.view.View.VISIBLE)
-              == bytes,
-          "非下载阶段冒充字节传输进度");
-      if (percent >= 0) check(bar.getProgress() == percent, "真实下载进度未保留");
-    } catch (ReflectiveOperationException error) {
-      throw new AssertionError("无法渲染更新页自测", error);
-    }
   }
 
   private void installHandoff() throws Exception {

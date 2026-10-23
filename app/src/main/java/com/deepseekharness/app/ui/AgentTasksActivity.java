@@ -12,11 +12,10 @@ import com.deepseekharness.app.util.UiText;
 
 /** Actual Agent turn facts; all cancellation goes through the authenticated one-shot queue. */
 public final class AgentTasksActivity extends AppCompatActivity {
-  private CardPage page;
-  private LinearLayout tasks;
+  private HyScreenModel model;
   private String signature = "";
   private final java.util.Map<
-          com.deepseekharness.app.util.AgentTaskState.Key, android.widget.TextView>
+          com.deepseekharness.app.util.AgentTaskState.Key, HyLine>
       timings = new java.util.HashMap<>();
   private final Handler main = new Handler(Looper.getMainLooper());
   private final Runnable refresh =
@@ -30,17 +29,12 @@ public final class AgentTasksActivity extends AppCompatActivity {
   @Override
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
-    page =
-        new CardPage(
-            this,
-            UiText.choose("Agent 任务", "Agent tasks"),
-            UiText.choose(
-                "查看实际对话进度。停止只作用于对应任务。显示最多 32 个活动任务及最近 5 个结束状态。",
-                "View actual conversation progress. Stop affects only the selected task. Shows up to 32 active tasks and the 5 most recent ended states."));
-    UiNavigation.addHeader(this, page.root, UiText.choose("Agent 任务", "Agent tasks"), this::finish);
-    page.content.removeViewAt(0);
-    tasks = page.content;
-    setContentView(page.root);
+    model = new HyScreenModel(UiText.choose("Agent 任务", "Agent tasks"));
+    model.note(
+        UiText.choose(
+            "查看实际对话进度。停止只作用于对应任务。显示最多 32 个活动任务及最近 5 个结束状态。",
+            "View actual conversation progress. Stop affects only the selected task. Shows up to 32 active tasks and the 5 most recent ended states."));
+    setContentView(HyScreenKt.hyScreen(this, model, true));
   }
 
   @Override
@@ -77,38 +71,33 @@ public final class AgentTasksActivity extends AppCompatActivity {
       return;
     }
     signature = next;
-    int scroll = page.scroll.getScrollY();
-    tasks.removeAllViews();
+    // 第一组是页面说明，其余每组对应一个任务。
+    while (model.getGroups().size() > 1) model.getGroups().remove(model.getGroups().size() - 1);
     timings.clear();
     if (rows.isEmpty()) {
-      tasks.addView(page.text(UiText.choose("暂无任务记录", "No task records"), 14, R.color.text));
+      model.section("").text(UiText.choose("暂无任务记录", "No task records"));
       return;
     }
     for (var row : rows) {
-      var card = page.card();
-      card.addView(page.text(AgentTaskNotifications.phase(row), 16, R.color.text));
-      var elapsed = page.text(timing(row), 12, R.color.text);
-      timings.put(row.key(), elapsed);
-      card.addView(elapsed);
+      var card = model.section("");
+      card.kv(AgentTaskNotifications.phase(row), "");
+      timings.put(row.key(), card.text(timing(row)));
       if (row.active() && !row.stopping() && !row.phase().equals("unknown"))
-        page.button(
-            card,
+        card.button(
             UiText.choose("停止", "Stop"),
             false,
             () -> {
               source.stop(AgentTaskNotifications.extras(new android.content.Intent(), row));
               render();
             });
-      page.button(
-          card,
+      card.arrow(
           UiText.choose("回聊天", "Return to chat"),
-          false,
+          "",
           () ->
               startActivity(
                   BrowserConversationRoute.conversation(
                       this, row.key().generation(), row.key().instance(), row.key().session())));
     }
-    page.scroll.post(() -> page.scroll.scrollTo(0, scroll));
   }
 
   private static String timing(com.deepseekharness.app.util.AgentTaskState.View row) {

@@ -26,24 +26,13 @@ public final class CommunityActivity extends AppCompatActivity {
     LinearLayout root = new LinearLayout(this);
     root.setOrientation(LinearLayout.VERTICAL);
     root.setBackgroundColor(getColor(R.color.surface));
-    LinearLayout bar = new LinearLayout(this);
-    bar.setGravity(android.view.Gravity.CENTER_VERTICAL);
-    Button back = new Button(this);
-    back.setText(UiText.choose("返回", "Back"));
-    back.setBackgroundResource(R.drawable.bg_action_plain);
-    back.setTextColor(getColor(R.color.primary));
-    bar.addView(back);
-    TextView title = new TextView(this);
-    title.setText(UiText.choose("社区插件生态", "Community plugins"));
-    title.setTextSize(19);
-    title.setTextColor(getColor(R.color.text));
-    bar.addView(title, new LinearLayout.LayoutParams(0, -2, 1));
-    Button reload = new Button(this);
-    reload.setText(UiText.choose("重试", "Retry"));
-    reload.setBackgroundResource(R.drawable.bg_action_plain);
-    reload.setTextColor(getColor(R.color.primary));
-    bar.addView(reload);
-    root.addView(bar);
+    root.addView(
+        PageBarKt.pageBar(
+            this,
+            UiText.choose("社区插件生态", "Community plugins"),
+            this::leave,
+            UiText.choose("重试", "Retry"),
+            () -> browser.loadUrl(com.deepseekharness.app.util.Constants.SITE_URL)));
     status = new TextView(this);
     status.setPadding(16, 8, 16, 8);
     status.setTextColor(getColor(R.color.text_muted));
@@ -93,9 +82,6 @@ public final class CommunityActivity extends AppCompatActivity {
         });
     root.addView(browser, new LinearLayout.LayoutParams(-1, 0, 1));
     setContentView(root);
-    back.setOnClickListener(v -> leave());
-    reload.setOnClickListener(
-        v -> browser.loadUrl(com.deepseekharness.app.util.Constants.SITE_URL));
     getOnBackPressedDispatcher()
         .addCallback(
             this,

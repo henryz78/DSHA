@@ -22,19 +22,9 @@ final class UiNavigation {
     return button;
   }
 
+  /** 非 CardPage 页面的顶栏，与 CardPage.topBar 同为 miuix 样式。 */
   static void addHeader(Context context, LinearLayout root, String title, Runnable action) {
-    LinearLayout row = new LinearLayout(context);
-    row.setGravity(Gravity.CENTER_VERTICAL);
-    row.setPadding(dp(context, 6), 0, dp(context, 18), 0);
-    row.addView(
-        back(context, action), new LinearLayout.LayoutParams(dp(context, 48), dp(context, 52)));
-    TextView label = new TextView(context);
-    label.setText(title);
-    label.setTextSize(18);
-    label.setTextColor(context.getColor(R.color.text));
-    label.setTypeface(null, android.graphics.Typeface.BOLD);
-    row.addView(label);
-    root.addView(row, 0);
+    root.addView(PageBarKt.pageBar(context, title, action), 0);
   }
 
   private static int dp(Context context, int n) {

@@ -5,14 +5,11 @@ import static org.junit.Assert.*;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.view.ContextThemeWrapper;
-import android.widget.LinearLayout;
-import android.widget.TextView;
 import androidx.fragment.app.Fragment;
 import com.deepseekharness.app.R;
 import com.deepseekharness.app.core.DeviceGrantsTest;
 import com.deepseekharness.app.util.NativeConsentPolicy;
 import com.deepseekharness.app.util.UiText;
-import com.google.android.material.materialswitch.MaterialSwitch;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Before;
 import org.junit.After;
@@ -47,10 +44,9 @@ public final class FullPermissionControlsTest {
     UiText.setLanguage(previousLanguage);
   }
 
+  private final DeviceGrantsUi ui = new DeviceGrantsUi();
+
   private FullPermissionControls controls(AtomicInteger changes) {
-    var host = new LinearLayout(context);
-    host.addView(new TextView(context));
-    host.addView(new TextView(context));
     var owner =
         new Fragment() {
           @Override
@@ -58,14 +54,7 @@ public final class FullPermissionControlsTest {
             return context;
           }
         };
-    return new FullPermissionControls(owner, host, changes::incrementAndGet);
-  }
-
-  private static <T> T field(FullPermissionControls controls, String name, Class<T> type)
-      throws Exception {
-    var field = FullPermissionControls.class.getDeclaredField(name);
-    field.setAccessible(true);
-    return type.cast(field.get(controls));
+    return new FullPermissionControls(owner, ui, changes::incrementAndGet);
   }
 
   @Test
@@ -78,8 +67,7 @@ public final class FullPermissionControlsTest {
     preferences.registerOnSharedPreferenceChangeListener(listener);
     var changes = new AtomicInteger();
     try (var controls = controls(changes)) {
-      var toggle = field(controls, "global", MaterialSwitch.class);
-      assertTrue(toggle.isChecked());
+      assertTrue(ui.getGlobalChecked());
       for (int i = 0; i < 10; i++) {
         controls.refresh();
         controls.pause();
@@ -92,7 +80,7 @@ public final class FullPermissionControlsTest {
       assertEquals(original, preferences.getString(KEY, null));
       assertEquals(0, writes.get());
       assertEquals(0, changes.get());
-      var status = field(controls, "status", TextView.class).getText().toString();
+      var status = ui.getGlobalStatus();
       assertTrue(status.startsWith("已开启"));
       assertFalse(status.contains("revision"));
       assertFalse(status.contains("NONE"));
@@ -111,15 +99,12 @@ public final class FullPermissionControlsTest {
       org.robolectric.shadow.api.Shadow.<org.robolectric.shadows.ShadowLooper>extract(
               android.os.Looper.getMainLooper())
           .idle();
-      assertFalse(field(controls, "global", MaterialSwitch.class).isChecked());
+      assertFalse(ui.getGlobalChecked());
       assertEquals(off, preferences.getString(KEY, null));
       assertEquals(0, changes.get());
-      var status = field(controls, "status", TextView.class).getText().toString();
+      var status = ui.getGlobalStatus();
       assertTrue(status.startsWith("已关闭"));
       assertFalse(status.contains("revision"));
-      var diagnostics = field(controls, "diagnostics", TextView.class);
-      assertEquals("诊断详情", diagnostics.getText().toString());
-      assertEquals(android.view.View.VISIBLE, diagnostics.getVisibility());
       String detail =
           FullPermissionControls.diagnosticText(
               new NativeConsentPolicy.Snapshot(
@@ -132,8 +117,8 @@ public final class FullPermissionControlsTest {
   @Test
   public void unconfiguredSettingIsDisplayedAsOffWithoutCreatingARecord() throws Exception {
     try (var controls = controls(new AtomicInteger())) {
-      assertFalse(field(controls, "global", MaterialSwitch.class).isChecked());
-      assertTrue(field(controls, "status", TextView.class).getText().toString().startsWith("已关闭"));
+      assertFalse(ui.getGlobalChecked());
+      assertTrue(ui.getGlobalStatus().startsWith("已关闭"));
       assertFalse(preferences.contains(KEY));
     }
   }

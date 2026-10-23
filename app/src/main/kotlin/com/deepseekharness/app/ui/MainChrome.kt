@@ -3,6 +3,7 @@ package com.deepseekharness.app.ui
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.systemBars
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.runtime.mutableIntStateOf
@@ -62,9 +63,16 @@ class MainChrome {
     }
   }
 
-  fun attachBottomBar(view: ComposeView, onSelect: IntConsumer) {
+  /** onStyle：经典/玻璃切换后回调，MainActivity 据此重新安排页面底部留白。 */
+  fun attachBottomBar(view: ComposeView, onSelect: IntConsumer, onStyle: Runnable) {
     view.setContent {
       HydshTheme {
+        val glass = GlassBar.enabled
+        LaunchedEffect(glass) { onStyle.run() }
+        if (glass) {
+          GlassNavigationBar(TABS, tab) { onSelect.accept(it) }
+          return@HydshTheme
+        }
         NavigationBar(defaultWindowInsetsPadding = false) {
           for ((id, icon, label) in TABS) {
             NavigationBarItem(

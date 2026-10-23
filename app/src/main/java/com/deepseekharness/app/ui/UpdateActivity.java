@@ -19,90 +19,81 @@ public final class UpdateActivity extends AppCompatActivity {
   private UpdateRepository repository;
   private boolean resumeInstall;
   private boolean installDispatchReady;
+  private HyLine status, progress, release, check, download, install, cancel, stable, preview;
+  private String notes = "";
 
   @Override
   protected void onCreate(Bundle saved) {
     super.onCreate(saved);
-    setContentView(R.layout.activity_update);
     repository = new ViewModelProvider(this).get(UpdateRepository.class);
     resumeInstall = saved != null && saved.getBoolean("resumeInstall");
     repository.restoreInterruptedInstall(saved != null && saved.getBoolean("installPending"));
-    ((TextView) findViewById(R.id.update_current)).setText(BuildConfig.VERSION_NAME);
-    ((TextView) findViewById(R.id.update_code)).setText(String.valueOf(BuildConfig.VERSION_CODE));
-    ((TextView) findViewById(R.id.update_edition))
-        .setText(
-            BuildConfig.LOW_ANDROID
-                ? com.deepseekharness.app.util.UiText.choose("兼容版", "Compatibility")
-                : com.deepseekharness.app.util.UiText.choose("标准版", "Standard"));
-    RadioGroup channels = findViewById(R.id.update_channels);
-    channels.check(
-        UpdatePolicy.PREVIEW.equals(repository.channel())
-            ? R.id.update_preview
-            : R.id.update_stable);
-    channels.setOnCheckedChangeListener(
-        (g, id) ->
-            repository.setChannel(
-                id == R.id.update_preview ? UpdatePolicy.PREVIEW : UpdatePolicy.STABLE));
-    DshaSelectView channel = findViewById(R.id.update_channel_choice);
-    channel.setPrompt(getString(R.string.ui2_update_channel));
-    channel.setAdapter(
-        new android.widget.ArrayAdapter<>(
-            this,
-            R.layout.item_data_choice,
-            new String[] {getString(R.string.ui_m0173), getString(R.string.ui_m0215)}));
-    channel.setSelection(UpdatePolicy.PREVIEW.equals(repository.channel()) ? 1 : 0);
-    channel.setOnItemSelectedListener(
-        new android.widget.AdapterView.OnItemSelectedListener() {
-          public void onNothingSelected(android.widget.AdapterView<?> parent) {}
-
-          public void onItemSelected(
-              android.widget.AdapterView<?> parent, android.view.View view, int position, long id) {
-            channels.check(position == 1 ? R.id.update_preview : R.id.update_stable);
-          }
-        });
-    findViewById(R.id.update_back).setOnClickListener(v -> finish());
-    ((TextView) findViewById(R.id.update_dsh))
-        .setText(com.deepseekharness.app.util.Constants.DSH_VERSION);
-    findViewById(R.id.update_runtime).setOnClickListener(v -> showRuntimePlan());
-    findViewById(R.id.update_runtime_rollback)
-        .setOnClickListener(v -> RuntimeRecoveryUi.show(this));
-
-    findViewById(R.id.update_changelog)
-        .setOnClickListener(
-            v -> CardSheet.show(this, getString(R.string.ui134_changelog), bundledChangelog()));
-    findViewById(R.id.update_release_detail)
-        .setOnClickListener(
-            v -> {
+    var model = new HyScreenModel(getString(R.string.ui2_updates));
+    model.note(com.deepseekharness.app.util.UiText.choose("查看应用与运行组件的版本信息。", "Version information for the app and runtime components."));
+    var versions = model.section("");
+    versions.kv(com.deepseekharness.app.util.UiText.choose("当前应用", "Current app"), BuildConfig.VERSION_NAME);
+    versions.kv(com.deepseekharness.app.util.UiText.choose("版本码", "Version code"), String.valueOf(BuildConfig.VERSION_CODE));
+    versions.kv(com.deepseekharness.app.util.UiText.choose("当前版本类型", "Edition"), com.deepseekharness.app.util.UiText.choose("标准版", "Standard"));
+    versions.kv("DSH", com.deepseekharness.app.util.Constants.DSH_VERSION);
+    var channel = model.section(getString(R.string.ui2_update_channel));
+    boolean previewChannel = UpdatePolicy.PREVIEW.equals(repository.channel());
+    stable = channel.radio(getString(R.string.ui_m0173), !previewChannel, () -> chooseChannel(false));
+    preview = channel.radio(getString(R.string.ui_m0215), previewChannel, () -> chooseChannel(true));
+    var update = model.section(com.deepseekharness.app.util.UiText.choose("检查与下载", "Check and download"));
+    status = update.selectable("");
+    progress = update.text("");
+    release =
+        update.arrow(
+            com.deepseekharness.app.util.UiText.choose("查看候选版本", "View candidate"),
+            com.deepseekharness.app.util.UiText.choose("更新记录、大小与安装方式", "Notes, size and installation"),
+            () -> {
               UpdateRepository.State state = repository.state().getValue();
               if (state != null && state.release != null)
-                CardSheet.show(
-                    this,
-                    getString(R.string.ui134_candidate),
-                    ((TextView) findViewById(R.id.update_notes)).getText().toString());
+                CardSheet.show(this, getString(R.string.ui134_candidate), notes);
             });
-    findViewById(R.id.update_check).setOnClickListener(v -> repository.check());
-    findViewById(R.id.update_download)
-        .setOnClickListener(
-            v -> {
+    check = update.button(com.deepseekharness.app.util.UiText.text("检查更新"), true, repository::check);
+    download =
+        update.button(
+            com.deepseekharness.app.util.UiText.text("下载更新"),
+            false,
+            () -> {
               if (android.os.Build.VERSION.SDK_INT >= 33
                   && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                       != android.content.pm.PackageManager.PERMISSION_GRANTED)
-                requestPermissions(
-                    new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, 104);
+                requestPermissions(new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, 104);
               else repository.download();
             });
-    findViewById(R.id.update_cancel).setOnClickListener(v -> repository.cancel());
-    findViewById(R.id.update_install).setOnClickListener(v -> install());
-    findViewById(R.id.update_browser)
-        .setOnClickListener(
-            v -> {
-              UpdateRepository.State state = repository.state().getValue();
-              AboutDialog.openBrowser(
-                  this,
-                  state != null && state.release != null
-                      ? state.release.pageUrl
-                      : com.deepseekharness.app.util.Constants.REPOSITORY_URL + "/releases");
-            });
+    install = update.button(com.deepseekharness.app.util.UiText.text("安装更新"), true, this::install);
+    cancel = update.button(com.deepseekharness.app.util.UiText.text("取消当前任务"), false, repository::cancel);
+    var manage = model.section(com.deepseekharness.app.util.UiText.choose("管理", "Manage"));
+    manage.arrow(
+        com.deepseekharness.app.util.UiText.choose("更新受管运行时", "Update managed runtime"),
+        com.deepseekharness.app.util.UiText.choose("只更新随包组件，保留个人数据", "Update bundled components only; keep personal data"),
+        R.drawable.ic_recovery_refresh,
+        this::showRuntimePlan);
+    manage.arrow(
+        com.deepseekharness.app.util.UiText.choose("兼容运行时回退", "Compatible runtime rollback"),
+        com.deepseekharness.app.util.UiText.choose("通过隔离试运行后再切换", "Switch only after an isolated trial"),
+        R.drawable.ic_recovery_wrench,
+        () -> RuntimeRecoveryUi.show(this));
+    manage.arrow(
+        getString(R.string.ui134_changelog),
+        BuildConfig.VERSION_NAME,
+        R.drawable.ic_recovery_document,
+        () -> CardSheet.show(this, getString(R.string.ui134_changelog), bundledChangelog()));
+    manage.arrow(
+        com.deepseekharness.app.util.UiText.choose("在浏览器查看发布页", "Open the release page"),
+        "",
+        R.drawable.ic_ui_link,
+        () -> {
+          UpdateRepository.State state = repository.state().getValue();
+          AboutDialog.openBrowser(
+              this,
+              state != null && state.release != null
+                  ? state.release.pageUrl
+                  : com.deepseekharness.app.util.Constants.REPOSITORY_URL + "/releases");
+        });
+    setContentView(HyScreenKt.hyScreen(this, model, true));
     repository.state().observe(this, this::renderState);
     repository
         .installation()
@@ -174,34 +165,78 @@ public final class UpdateActivity extends AppCompatActivity {
         if (output.size() + count > 16384) throw new java.io.IOException("CHANGELOG_LIMIT");
         output.write(block, 0, count);
       }
-      return "DSHA " + BuildConfig.VERSION_NAME + "\n\n" + output.toString("UTF-8");
+      return "HYDSH " + BuildConfig.VERSION_NAME + "\n\n" + output.toString("UTF-8");
     } catch (java.io.IOException | android.content.res.Resources.NotFoundException failure) {
       com.deepseekharness.app.core.DiagnosticLog.record(this, "changelog", failure.toString());
-      return "DSHA " + BuildConfig.VERSION_NAME;
+      return "HYDSH " + BuildConfig.VERSION_NAME;
     }
+  }
+
+  private void chooseChannel(boolean previewChannel) {
+    UpdateRepository.State state = repository.state().getValue();
+    if ((state != null && state.busy) || repository.installationPending()) return;
+    repository.setChannel(previewChannel ? UpdatePolicy.PREVIEW : UpdatePolicy.STABLE);
+    stable.setChecked(!previewChannel);
+    preview.setChecked(previewChannel);
   }
 
   private void renderState(UpdateRepository.State state) {
     if (state == null) return;
-    findViewById(R.id.update_channel_choice)
-        .setEnabled(!state.busy && !repository.installationPending());
-    UpdateRepository.InstallState install = repository.installation().getValue();
-    UpdateUi.render(
-        findViewById(android.R.id.content), state, install.pending(), install.verifying);
-    if (install.pending()) {
-      ((TextView) findViewById(R.id.update_status))
-          .setText(
-              install.verifying
-                  ? com.deepseekharness.app.util.UiText.text("正在重新校验安装包…")
-                  : com.deepseekharness.app.util.UiText.text("校验完成，返回此页面后继续安装"));
-    } else if (install.error != null) {
-      ((TextView) findViewById(R.id.update_status))
-          .setText(
-              com.deepseekharness.app.util.UiText.format(
-                  "%s\n%s",
-                  com.deepseekharness.app.util.UiStateText.render(state.message),
-                  com.deepseekharness.app.util.UiStateText.render(install.error)));
-    }
+    UpdateRepository.InstallState installState = repository.installation().getValue();
+    boolean installing = installState.pending();
+    boolean verifying = installState.verifying;
+    boolean busy = state.busy || installing;
+    stable.setEnabled(!busy);
+    preview.setEnabled(!busy);
+    notes =
+        state.release == null
+            ? ""
+            : state.release.version
+                + " · "
+                + String.format(java.util.Locale.ROOT, "%.2f MiB", state.release.bytes / 1048576.0)
+                + "\n\n"
+                + state.release.notes;
+    String message = com.deepseekharness.app.util.UiStateText.render(state.message);
+    if (installing)
+      message =
+          verifying
+              ? com.deepseekharness.app.util.UiText.text("正在重新校验安装包…")
+              : com.deepseekharness.app.util.UiText.text("校验完成，返回此页面后继续安装");
+    else if (installState.error != null)
+      message =
+          com.deepseekharness.app.util.UiText.format(
+              "%s\n%s", message, com.deepseekharness.app.util.UiStateText.render(installState.error));
+    status.setText(message);
+    boolean showBytes =
+        state.total > 0
+            && !verifying
+            && (state.stage == UpdateRepository.Stage.IDLE
+                || state.stage == UpdateRepository.Stage.DOWNLOADING);
+    progress.setText(
+        showBytes
+            ? String.format(
+                java.util.Locale.ROOT,
+                "%.1f / %.1f MiB",
+                state.downloaded / 1048576.0,
+                state.total / 1048576.0)
+            : "");
+    progress.setVisible(showBytes);
+    release.setVisible(state.release != null);
+    check.setEnabled(!busy);
+    check.setText(
+        state.release == null
+            ? com.deepseekharness.app.util.UiText.text("检查更新")
+            : com.deepseekharness.app.util.UiText.text("重新检查"));
+    check.setPrimary(state.release == null);
+    download.setVisible(state.release != null && state.apk == null);
+    download.setEnabled(!busy && state.release != null);
+    download.setText(
+        state.downloaded > 0 && state.apk == null
+            ? com.deepseekharness.app.util.UiText.text("继续下载")
+            : com.deepseekharness.app.util.UiText.text("下载更新"));
+    install.setVisible(state.apk != null);
+    install.setEnabled(!busy && state.apk != null);
+    cancel.setVisible(state.busy && !installing);
   }
 
   private void install() {

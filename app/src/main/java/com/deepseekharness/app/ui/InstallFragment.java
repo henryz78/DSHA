@@ -24,23 +24,8 @@ import com.deepseekharness.app.util.InstallTask;
 import com.deepseekharness.app.util.SensitiveData;
 
 /** 安装页只展示应用级任务快照；页面销毁不影响后台任务、取消信号或结果。 */
-public class InstallFragment extends Fragment {
-  private static final int[] STEP_IDS = {
-    R.id.install_step1,
-    R.id.install_step2,
-    R.id.install_step3,
-    R.id.install_step4,
-    R.id.install_step5,
-    R.id.install_step6
-  };
-  private static final int[] STATE_IDS = {
-    R.id.install_state1,
-    R.id.install_state2,
-    R.id.install_state3,
-    R.id.install_state4,
-    R.id.install_state5,
-    R.id.install_state6
-  };
+public class InstallFragment extends Fragment implements OwnTopBar {
+  private final InstallUi ui = new InstallUi();
   private final Handler handler = new Handler(Looper.getMainLooper());
   private InstallRepository repository;
   private long shownRevision = -1;
@@ -49,7 +34,7 @@ public class InstallFragment extends Fragment {
       new Runnable() {
         @Override
         public void run() {
-          if (getView() == null || !isResumed()) return;
+          if (!isResumed()) return;
           render();
           handler.postDelayed(this, 1_000);
         }
@@ -59,77 +44,74 @@ public class InstallFragment extends Fragment {
   @Override
   public View onCreateView(
       @NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle state) {
-    return inflater.inflate(R.layout.fragment_install, container, false);
-  }
-
-  @Override
-  public void onViewCreated(@NonNull View view, @Nullable Bundle state) {
     repository = InstallRepository.get(requireContext());
     shownRevision = -1;
     lastRenderKey = "";
-    view.findViewById(R.id.install_status)
-        .setOnClickListener(v -> BackgroundTasksActivity.open(requireContext()));
     var controller = com.deepseekharness.app.core.HarnessController.get(requireContext());
-    ((TextView) view.findViewById(R.id.install_environment))
-        .setText(
-            controller.isEnvironmentReady()
-                ? com.deepseekharness.app.util.UiText.choose("可用", "Available")
-                : com.deepseekharness.app.util.UiText.choose("等待检查", "Needs checking"));
-    ((TextView) view.findViewById(R.id.install_app_version))
-        .setText(com.deepseekharness.app.BuildConfig.VERSION_NAME);
+    ui.setEnvironment(
+        controller.isEnvironmentReady()
+            ? com.deepseekharness.app.util.UiText.choose("可用", "Available")
+            : com.deepseekharness.app.util.UiText.choose("等待检查", "Needs checking"));
+    ui.setAppVersion(com.deepseekharness.app.BuildConfig.VERSION_NAME);
     try {
       var descriptor = controller.proot().installedRuntimeDescriptor();
       var identity = descriptor == null ? java.util.Map.of() : descriptor.json();
-      ((TextView) view.findViewById(R.id.install_base))
-          .setText(String.valueOf(identity.getOrDefault("baseVersion", "—")));
-      ((TextView) view.findViewById(R.id.install_runtime))
-          .setText(String.valueOf(identity.getOrDefault("dshVersion", "—")));
+      ui.setBase(String.valueOf(identity.getOrDefault("baseVersion", "—")));
+      ui.setRuntime(String.valueOf(identity.getOrDefault("dshVersion", "—")));
     } catch (java.io.IOException unknown) {
-      ((TextView) view.findViewById(R.id.install_base)).setText("—");
-      ((TextView) view.findViewById(R.id.install_runtime)).setText("—");
+      ui.setBase("—");
+      ui.setRuntime("—");
     }
-    view.findViewById(R.id.install_managed_update)
-        .setOnClickListener(
-            v ->
+    View page =
+        InstallScreenKt.installPage(
+            requireContext(),
+            ui,
+            new InstallActions() {
+              public void speedTest() {
+                startActivity(new Intent(requireContext(), ColdSetupSpeedActivity.class));
+              }
+
+              public void check() {
+                start(false, 0);
+              }
+
+              public void repair() {
+                start(true, 0);
+              }
+
+              public void cancel() {
+                repository.cancel();
+                render();
+              }
+
+              public void copyLog() {
+                InstallFragment.this.copyLog();
+              }
+
+              public void maintenance() {
+                confirmMaintenance();
+              }
+
+              public void step(int step) {
+                showStep(step);
+              }
+
+              public void managedUpdate() {
                 startActivity(
                     new Intent(requireContext(), ExtractActivity.class)
-                        .putExtra("review_only", true)));
-    view.findViewById(R.id.install_environment_recovery)
-        .setOnClickListener(
-            v -> startActivity(new Intent(requireContext(), StartupRecoveryActivity.class)));
-    ((TextView) view.findViewById(R.id.install_storage_help))
-        .setText(com.deepseekharness.app.util.UiText.text("首次安装测速"));
-    view.findViewById(R.id.install_storage_help)
-        .setOnClickListener(
-            v -> startActivity(new Intent(requireContext(), ColdSetupSpeedActivity.class)));
+                        .putExtra("review_only", true));
+              }
 
-    view.findViewById(R.id.install_btn).setOnClickListener(v -> start(false, 0));
-    view.findViewById(R.id.install_repair).setOnClickListener(v -> start(true, 0));
-    view.findViewById(R.id.install_cancel)
-        .setOnClickListener(
-            v -> {
-              repository.cancel();
-              render();
+              public void recovery() {
+                startActivity(new Intent(requireContext(), StartupRecoveryActivity.class));
+              }
+
+              public void tasks() {
+                BackgroundTasksActivity.open(requireContext());
+              }
             });
-    view.findViewById(R.id.install_copy).setOnClickListener(v -> copyLog());
-    view.findViewById(R.id.install_uninstall).setOnClickListener(v -> confirmMaintenance());
-    for (int i = 0; i < STEP_IDS.length; i++) {
-      final int step = i + 1;
-      view.findViewById(STEP_IDS[i]).setOnClickListener(v -> showStep(step));
-    }
     render();
-  }
-
-  @Override
-  public void onViewStateRestored(@Nullable Bundle state) {
-    super.onViewStateRestored(state);
-    View view = getView();
-    if (state == null && view != null)
-      view.post(
-          () -> {
-            if (getView() == view)
-              ((ScrollView) view.findViewById(R.id.install_scroll)).scrollTo(0, 0);
-          });
+    return page;
   }
 
   @Override
@@ -186,8 +168,7 @@ public class InstallFragment extends Fragment {
   }
 
   private void render() {
-    View view = getView();
-    if (view == null || repository == null) return;
+    if (repository == null || getContext() == null) return;
     InstallTask.Snapshot state = repository.snapshot();
     boolean environmentBusy = MaintenanceCoordinator.isEnvironmentTaskBusy();
     BackupTask maintenanceTask = BackupTask.get(requireContext());
@@ -208,34 +189,33 @@ public class InstallFragment extends Fragment {
             + pending;
     if (renderKey.equals(lastRenderKey)) return;
     lastRenderKey = renderKey;
-    ((TextView) view.findViewById(R.id.install_status))
-        .setText(
-            state.busy()
-                ? state.phase
-                : environmentBusy
-                    ? "环境任务进行中：" + EnvironmentTaskGate.activeKind()
-                    : pending
-                        ? com.deepseekharness.app.util.UiText.text("上次环境维护尚未完成，请先恢复原环境")
-                        : state.outcome == InstallTask.Outcome.IDLE
-                            ? com.deepseekharness.app.util.UiText.text("检查环境，或按需修复缺项")
-                            : state.phase);
-    TextView progress = view.findViewById(R.id.install_progress);
-    progress.setVisibility(state.outcome == InstallTask.Outcome.IDLE ? View.GONE : View.VISIBLE);
-    progress.setText(
-        com.deepseekharness.app.util.UiText.format(
-            "%s · 总耗时 %s 秒%s%s",
-            (state.repair
-                ? com.deepseekharness.app.util.UiText.text("检查与按需修复")
-                : com.deepseekharness.app.util.UiText.text("仅检查")),
-            state.elapsedSeconds,
-            (state.busy()
-                ? com.deepseekharness.app.util.UiText.format(" · 当前阶段 %s 秒", state.stageSeconds)
-                : ""),
-            (state.cancelRequested && state.busy()
-                ? (state.cancellable
-                    ? com.deepseekharness.app.util.UiText.text("\n正在取消检查…")
-                    : com.deepseekharness.app.util.UiText.text("\n等待当前修复到达安全点，随后停止"))
-                : "")));
+    ui.setStatus(
+        state.busy()
+            ? state.phase
+            : environmentBusy
+                ? "环境任务进行中：" + EnvironmentTaskGate.activeKind()
+                : pending
+                    ? com.deepseekharness.app.util.UiText.text("上次环境维护尚未完成，请先恢复原环境")
+                    : state.outcome == InstallTask.Outcome.IDLE
+                        ? com.deepseekharness.app.util.UiText.text("检查环境，或按需修复缺项")
+                        : state.phase);
+    ui.setProgress(
+        state.outcome == InstallTask.Outcome.IDLE
+            ? ""
+            : com.deepseekharness.app.util.UiText.format(
+                "%s · 总耗时 %s 秒%s%s",
+                (state.repair
+                    ? com.deepseekharness.app.util.UiText.text("检查与按需修复")
+                    : com.deepseekharness.app.util.UiText.text("仅检查")),
+                state.elapsedSeconds,
+                (state.busy()
+                    ? com.deepseekharness.app.util.UiText.format(" · 当前阶段 %s 秒", state.stageSeconds)
+                    : ""),
+                (state.cancelRequested && state.busy()
+                    ? (state.cancellable
+                        ? com.deepseekharness.app.util.UiText.text("\n正在取消检查…")
+                        : com.deepseekharness.app.util.UiText.text("\n等待当前修复到达安全点，随后停止"))
+                    : "")));
     int completed = 0, total = state.selected == 0 ? 6 : 1;
     for (int i = 0; i < state.steps.length; i++) {
       if (state.selected == 0 || state.selected == i + 1) {
@@ -243,77 +223,47 @@ public class InstallFragment extends Fragment {
             || state.steps[i] == InstallTask.Step.FAILED
             || state.steps[i] == InstallTask.Step.SKIPPED) completed++;
       }
-      String label;
+      int value;
       switch (state.steps[i]) {
         case RUNNING:
-          label = com.deepseekharness.app.util.UiText.text("进行中");
+          value = 1;
           break;
         case OK:
-          label = com.deepseekharness.app.util.UiText.text("成功");
+          value = 2;
           break;
         case FAILED:
-          label = com.deepseekharness.app.util.UiText.text("失败");
+          value = 3;
           break;
         case SKIPPED:
-          label = com.deepseekharness.app.util.UiText.text("未完成");
+          value = 4;
           break;
         default:
-          label = com.deepseekharness.app.util.UiText.text("未检查");
+          value = 0;
       }
-      TextView status = view.findViewById(STATE_IDS[i]);
-      status.setText(label);
-      int color =
-          state.steps[i] == InstallTask.Step.OK
-              ? R.color.ok
-              : state.steps[i] == InstallTask.Step.FAILED
-                  ? R.color.err
-                  : state.steps[i] == InstallTask.Step.RUNNING
-                      ? R.color.primary
-                      : R.color.text_muted;
-      status.setTextColor(androidx.core.content.ContextCompat.getColor(requireContext(), color));
-      view.findViewById(STEP_IDS[i])
-          .setContentDescription(
-              com.deepseekharness.app.util.UiText.format(
-                  "%s，%s，点击查看详情",
-                  com.deepseekharness.app.util.UiText.text(InstallTask.NAMES[i]), label));
+      ui.setStep(i, value);
     }
-    ProgressBar bar = view.findViewById(R.id.install_progressbar);
-    bar.setVisibility(state.busy() ? View.VISIBLE : View.GONE);
-    bar.setIndeterminate(false);
-    bar.setProgress(completed * 100 / total);
-    for (int id : new int[] {R.id.install_btn, R.id.install_repair})
-      view.findViewById(id).setEnabled(!state.busy() && !environmentBusy && !pending);
-    Button maintenance = view.findViewById(R.id.install_uninstall);
-    maintenance.setText(
+    ui.setProgressValue(state.busy() ? completed / (float) total : -1f);
+    ui.setCheckEnabled(!state.busy() && !environmentBusy && !pending);
+    ui.setMaintenanceText(
         pending
             ? com.deepseekharness.app.util.UiText.text("恢复中断维护")
             : com.deepseekharness.app.util.UiText.text("备份并重建环境"));
-    maintenance.setEnabled(!state.busy() && !environmentBusy);
-    Button cancel = view.findViewById(R.id.install_cancel);
-    cancel.setVisibility(state.busy() ? View.VISIBLE : View.GONE);
-    cancel.setEnabled(!state.cancelRequested);
-    cancel.setText(
+    ui.setMaintenanceEnabled(!state.busy() && !environmentBusy);
+    ui.setCancelVisible(state.busy());
+    ui.setCancelEnabled(!state.cancelRequested);
+    ui.setCancelText(
         state.cancelRequested
             ? com.deepseekharness.app.util.UiText.text("等待停止…")
             : state.cancellable
                 ? com.deepseekharness.app.util.UiText.text("取消检查")
                 : com.deepseekharness.app.util.UiText.text("安全停止后续修复"));
-    TextView error = view.findViewById(R.id.install_error);
-    error.setVisibility(state.failure.isEmpty() ? View.GONE : View.VISIBLE);
-    error.setText(com.deepseekharness.app.util.MaintenanceErrorText.render(state.failure));
-    view.findViewById(R.id.install_copy)
-        .setVisibility(state.log.isEmpty() ? View.GONE : View.VISIBLE);
+    ui.setError(
+        state.failure.isEmpty()
+            ? ""
+            : com.deepseekharness.app.util.MaintenanceErrorText.render(state.failure));
     if (shownRevision != state.revision) {
       shownRevision = state.revision;
-      TextView log = view.findViewById(R.id.install_log);
-      LogScrollView scroll = view.findViewById(R.id.install_log_scroll);
-      boolean follow = scroll.shouldFollowEnd();
-      log.setText(
-          state.log.isEmpty()
-              ? com.deepseekharness.app.util.UiText.text("执行后将在此逐行显示脱敏输出。")
-              : state.log);
-      // fullScroll 会请求日志焦点并让外层页面滚到日志区域；这里只改变日志自身的滚动位置。
-      if (follow) scroll.followEndAfterLayout();
+      ui.setLog(state.log);
     }
   }
 
@@ -367,7 +317,7 @@ public class InstallFragment extends Fragment {
                 ? com.deepseekharness.app.util.UiText.text("恢复原环境")
                 : com.deepseekharness.app.util.UiText.text("备份并重建"),
             (dialog, which) -> {
-              if (!isAdded() || getView() == null) return;
+              if (!isAdded()) return;
               try {
                 // BackupTask 在发布任务前原子取得同一全局锁，旧弹窗也不能绕过互斥。
                 if (!(recovery ? maintenance.recoverMaintenance() : maintenance.rebuild())) {
