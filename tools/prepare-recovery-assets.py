@@ -157,11 +157,8 @@ def prepare(output, shared_assets):
     launchers = {}
     for flavor, folder, names in [
         ('standard', 'main', ['libproot.so', 'libprootloader.so', 'libtalloc.so', 'libandroidshmem.so']),
-        ('low', 'low', ['libproot_legacy.so', 'libprootloader_legacy.so'])
     ]:
         launchers[flavor] = {name: digest(ROOT / ('app/src/' + folder + '/jniLibs/arm64-v8a') / name) for name in names}
-    launchers['low']['libtalloc.so'] = launchers['standard']['libtalloc.so']
-    launchers['low']['libandroidshmem.so'] = launchers['standard']['libandroidshmem.so']
     profiles = {name: digest(ROOT / 'app/src/main/assets' / name)
                 for name in ['recovery-profile-package.json', 'recovery-profile.patch.yml']}
     overlay_inputs = {name: digest(ROOT / 'app/src/main/assets' / name) for name in INPUT_ASSETS}

@@ -246,7 +246,7 @@ public class ConfigFragment extends Fragment {
                   if (!overlayEnabled) OverlayController.teardown(ctx.getApplicationContext());
                   else if (OverlayController.permitted(ctx))
                     OverlayController.applyStyleNow(ctx.getApplicationContext());
-                  applyLanMode(c, lan.isChecked());
+                  applyLanMode(ctx, lan.isChecked());
                   if (lan.isChecked() && getActivity() instanceof MainActivity)
                     ((MainActivity) getActivity()).requestLocalNetwork();
                   Toast.makeText(
@@ -340,22 +340,22 @@ public class ConfigFragment extends Fragment {
   }
 
   /** LAN 开关真正生效：开启时若 dsh 已鉴权则启动 3081 代理，关闭时停掉监听。 */
-  private void applyLanMode(ConfigStore c, boolean on) {
+  static void applyLanMode(android.content.Context ctx, boolean on) {
     try {
       if (!on) {
         com.deepseekharness.app.LanProxyService.stopLanListener();
-        com.deepseekharness.app.HarnessService.refreshPowerMode(requireContext());
+        com.deepseekharness.app.HarnessService.refreshPowerMode(ctx);
         return;
       }
-      com.deepseekharness.app.HarnessService.ensureLanForeground(requireContext());
-      HarnessController hc = HarnessController.get(requireContext());
+      com.deepseekharness.app.HarnessService.ensureLanForeground(ctx);
+      HarnessController hc = HarnessController.get(ctx);
       long gen = hc.getWebGeneration();
       if (gen <= 0 || !com.deepseekharness.app.LanProxyService.hasDshAuth(gen)) {
         // dsh 还没起来/还没交换 cookie：等下次进入对话时 HarnessController 自动启动
         return;
       }
       com.deepseekharness.app.LanProxyService.start(
-          hc.proot().getRootfsDir().getAbsolutePath(), requireContext(), hc.getWebPort(), gen);
+          hc.proot().getRootfsDir().getAbsolutePath(), ctx, hc.getWebPort(), gen);
     } catch (Throwable t) {
       android.util.Log.w(
           "DSHA", com.deepseekharness.app.util.UiText.format("LAN 开关生效失败: %s", t.getMessage()));
