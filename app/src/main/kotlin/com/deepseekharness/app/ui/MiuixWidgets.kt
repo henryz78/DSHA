@@ -203,3 +203,38 @@ class MiuixSlider @JvmOverloads constructor(context: Context, attrs: AttributeSe
     }
   }
 }
+
+/**
+ * 状态提示行（替换旧页面里的 TextView）：保留 setText，画的是 miuix Text。
+ * tone：0 次要灰字，1 正文，2 错误红字。
+ */
+class MiuixText @JvmOverloads constructor(context: Context, attrs: AttributeSet? = null) :
+  AbstractComposeView(context, attrs) {
+  private var label by mutableStateOf<CharSequence>("")
+  var tone by mutableStateOf(0)
+
+  fun setText(value: CharSequence?) {
+    label = value ?: ""
+    contentDescription = label
+  }
+
+  fun getText(): CharSequence = label
+
+  @Composable
+  override fun Content() {
+    HydshTheme {
+      val colors = MiuixTheme.colorScheme
+      Text(
+        text = label.toString(),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+        color =
+          when (tone) {
+            1 -> colors.onSurface
+            2 -> colors.error
+            else -> colors.onSurfaceVariantSummary
+          },
+        fontSize = 14.sp,
+      )
+    }
+  }
+}

@@ -23,7 +23,7 @@ public final class RecoveryWebActivity extends AppCompatActivity {
   }
 
   private Retained retained;
-  private TextView status;
+  private MiuixText status;
   private FrameLayout container;
   private BrowserMicrophone microphone;
 
@@ -51,35 +51,23 @@ public final class RecoveryWebActivity extends AppCompatActivity {
     root.setOrientation(LinearLayout.VERTICAL);
     root.setBackgroundColor(getColor(R.color.surface));
     setContentView(root);
-    LinearLayout toolbar = new LinearLayout(this);
-    toolbar.setOrientation(LinearLayout.HORIZONTAL);
-    int gap = Math.round(8 * getResources().getDisplayMetrics().density);
-    toolbar.setPadding(gap + gap / 2, gap, gap + gap / 2, gap);
-    root.addView(toolbar, new LinearLayout.LayoutParams(-1, -2));
-    MiuixButton repairs = new MiuixButton(this);
-    repairs.setText(UiText.choose("应急 DSH · 修复提案", "Emergency DSH · Repairs"));
-    repairs.setPrimary(false);
-    repairs.setOnClickListener(v -> startActivity(new Intent(this, RecoveryActivity.class)));
-    toolbar.addView(repairs, new LinearLayout.LayoutParams(0, -2, 3));
-    MiuixButton retry = new MiuixButton(this);
-    retry.setText(UiText.choose("重载", "Reload"));
-    retry.setContentDescription(UiText.choose("重新加载应急页面", "Reload emergency page"));
-    retry.setPrimary(false);
-    retry.setOnClickListener(
-        v -> {
-          if (retained.browser != null) {
-            retained.browser.close();
-            retained.browser = null;
-          }
-          recreate();
-        });
-    LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(0, -2, 1);
-    retryParams.leftMargin = gap;
-    toolbar.addView(retry, retryParams);
-    status = new TextView(this);
-    status.setTextSize(14);
-    status.setTextColor(getColor(R.color.err));
-    status.setPadding(16, 8, 16, 8);
+    root.addView(
+        PageBarKt.pageBar(
+            this,
+            UiText.choose("应急 DSH", "Emergency DSH"),
+            () -> getOnBackPressedDispatcher().onBackPressed(),
+            UiText.choose("修复提案", "Repairs"),
+            () -> startActivity(new Intent(this, RecoveryActivity.class)),
+            UiText.choose("重载", "Reload"),
+            () -> {
+              if (retained.browser != null) {
+                retained.browser.close();
+                retained.browser = null;
+              }
+              recreate();
+            }));
+    status = new MiuixText(this);
+    status.setTone(2);
     root.addView(status, new LinearLayout.LayoutParams(-1, -2));
     status.setVisibility(View.GONE);
     container = new FrameLayout(this);
@@ -103,10 +91,8 @@ public final class RecoveryWebActivity extends AppCompatActivity {
     if (!snapshot.modelCredentialAvailable) {
       LinearLayout notice = new LinearLayout(this);
       notice.setOrientation(LinearLayout.VERTICAL);
-      notice.setPadding(16, 8, 16, 8);
-      TextView hint = new TextView(this);
-      hint.setTextSize(14);
-      hint.setTextColor(getColor(R.color.text));
+      MiuixText hint = new MiuixText(this);
+      hint.setTone(1);
       hint.setText(
           UiText.choose(
               "本次应急启动未取得模型密钥。诊断页仍可用；发送对话前，请返回应急页停止服务并填写临时 API Key 后重新启动。",
@@ -115,7 +101,10 @@ public final class RecoveryWebActivity extends AppCompatActivity {
       MiuixButton configure = new MiuixButton(this);
       configure.setText(UiText.choose("返回应急页配置", "Open recovery settings"));
       configure.setOnClickListener(v -> startActivity(new Intent(this, RecoveryActivity.class)));
-      notice.addView(configure, new LinearLayout.LayoutParams(-1, -2));
+      LinearLayout.LayoutParams configureParams = new LinearLayout.LayoutParams(-1, -2);
+      int side = Math.round(16 * getResources().getDisplayMetrics().density);
+      configureParams.setMargins(side, 0, side, 0);
+      notice.addView(configure, configureParams);
       root.addView(notice, 2, new LinearLayout.LayoutParams(-1, -2));
     }
     String identity = snapshot.instanceId + ":" + snapshot.generation;

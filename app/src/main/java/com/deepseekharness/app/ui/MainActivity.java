@@ -158,23 +158,10 @@ public class MainActivity extends AppCompatActivity {
     // FragmentManager可能先于后台磁盘检查恢复页面。首次就保留真实容器，
     // 后面只移除覆盖层，避免替换整个布局后恢复视图无法重新附着。
     setContentView(R.layout.activity_main);
-    var layout = new android.widget.LinearLayout(this);
-    layout.setOrientation(android.widget.LinearLayout.VERTICAL);
-    layout.setGravity(android.view.Gravity.CENTER);
-    layout.setBackgroundColor(getColor(R.color.surface));
-    layout.setClickable(true);
-    layout.setFocusable(true);
-    TextView status = new TextView(this);
-    status.setText(
-        com.deepseekharness.app.util.UiText.choose("正在检查运行环境…", "Checking the runtime…"));
-    layout.addView(status);
-    layout.addView(new android.widget.ProgressBar(this));
-    android.widget.Button diagnostics = new android.widget.Button(this);
-    diagnostics.setText(com.deepseekharness.app.util.UiText.choose("查看诊断", "View diagnostics"));
-    diagnostics.setOnClickListener(v -> startActivity(DiagnosticActivity.downloadLogs(this)));
-    layout.addView(diagnostics);
-    entryOverlay = layout;
-    addContentView(layout, new android.view.ViewGroup.LayoutParams(-1, -1));
+    entryOverlay =
+        EntryCheckScreenKt.entryCheckPage(
+            this, () -> startActivity(DiagnosticActivity.downloadLogs(this)));
+    addContentView(entryOverlay, new android.view.ViewGroup.LayoutParams(-1, -1));
   }
 
   private void checkEntry(
@@ -224,13 +211,44 @@ public class MainActivity extends AppCompatActivity {
         });
   }
 
+  /**
+   * 检查页等主界面当前页真正排好版后再淡出：两页标题在同一位置，交接时看起来是同一页，
+   * 不会先闪一下空白（最多等约 1 秒）。
+   */
+  private void dismissEntryOverlay(int frames) {
+    android.view.View overlay = entryOverlay;
+    if (overlay == null || !(overlay.getParent() instanceof android.view.ViewGroup parent)) {
+      entryOverlay = null;
+      return;
+    }
+    Fragment page = shownFragment();
+    boolean drawn = page != null && page.getView() != null && page.getView().isLaidOut();
+    if (!drawn && frames < 60 && !isDestroyed()) {
+      android.view.Choreographer.getInstance()
+          .postFrameCallback(t -> dismissEntryOverlay(frames + 1));
+      return;
+    }
+    entryOverlay = null;
+    if (!android.animation.ValueAnimator.areAnimatorsEnabled()) {
+      parent.removeView(overlay);
+      return;
+    }
+    // 再隔一帧，确保主界面这一帧已经画出来。
+    overlay.postOnAnimation(
+        () ->
+            overlay
+                .animate()
+                .alpha(0f)
+                .setDuration(150)
+                .withEndAction(() -> parent.removeView(overlay))
+                .start());
+  }
+
   private void showMain(
       Bundle savedInstanceState, ConfigStore config, HarnessController controller) {
     if (mainReady || isFinishing() || isDestroyed()) return;
     mainReady = true;
-    if (entryOverlay != null && entryOverlay.getParent() instanceof android.view.ViewGroup parent)
-      parent.removeView(entryOverlay);
-    entryOverlay = null;
+    dismissEntryOverlay(0);
     TextView recovery = findViewById(R.id.environment_recovery_banner);
     recovery.setOnClickListener(
         v -> {

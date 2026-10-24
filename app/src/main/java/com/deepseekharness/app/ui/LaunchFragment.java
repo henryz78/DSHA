@@ -50,6 +50,9 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
   private boolean environmentRecovery;
 
   private boolean preparingStart;
+  /** 启动没被接受时（如环境需要更新）留在状态行的原因；下次启动或停止时清掉。 */
+  private String startNotice = "";
+  private String lastStartMessage = "";
   private final java.util.concurrent.atomic.AtomicLong startRequest =
       new java.util.concurrent.atomic.AtomicLong();
   private static final java.util.concurrent.Executor START_IO =
@@ -190,6 +193,7 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
     final View root = getView();
     startRequest.incrementAndGet();
     preparingStart = false;
+    startNotice = "";
     FirstRunWebStart.cancel(requireContext());
     invalidateWebEntry();
     controller.stopWeb(
@@ -220,6 +224,8 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
     if (root == null || !isResumed() || activity.isFinishing() || activity.isDestroyed()) return;
     FirstRunWebStart.cancel(requireContext());
     preparingStart = true;
+    startNotice = "";
+    lastStartMessage = "";
     long request = startRequest.incrementAndGet();
     invalidateWebEntry();
     startAtMs = System.currentTimeMillis();
@@ -235,7 +241,8 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
           activity.runOnUiThread(
               () -> {
                 if (getView() != root || generation != controller.getWebGeneration()) return;
-                state.setStatus(com.deepseekharness.app.util.UiStateText.render(msg));
+                lastStartMessage = com.deepseekharness.app.util.UiStateText.render(msg);
+                state.setStatus(lastStartMessage);
                 refreshRunState();
                 refreshLanAddr();
               });
@@ -251,13 +258,20 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
             () -> {
               if (startRequest.get() != request || getView() != root) return;
               preparingStart = false;
+              keepRejectedStartReason();
               refreshRunState();
               refreshLanAddr();
             });
     if (!queued) {
       preparingStart = false;
+      keepRejectedStartReason();
       refreshRunState();
     }
+  }
+
+  /** 启动请求结束后既没在启动、也没就绪：说明被拒绝了，把原因留在状态行，不然看起来像按钮没反应。 */
+  private void keepRejectedStartReason() {
+    if (!controller.isStarting() && webEntryUrl().isEmpty()) startNotice = lastStartMessage;
   }
 
   /**
@@ -430,7 +444,9 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
               || starting
               || stopping
               || unresolvedStop
-              || !trace.issues.isEmpty());
+              || !trace.issues.isEmpty()
+              || !starting && !startNotice.isEmpty());
+      if (!starting && !startNotice.isEmpty()) state.setStatus(startNotice);
       if (starting)
         state.setStatus(
             UiText.format(

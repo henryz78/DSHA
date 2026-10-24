@@ -1,6 +1,5 @@
 package com.deepseekharness.app.ui;
 
-import android.app.TimePickerDialog;
 import android.os.Bundle;
 import android.content.Intent;
 import android.widget.*;
@@ -98,50 +97,31 @@ public final class AutomaticBackupActivity extends AppCompatActivity {
           String.format(java.util.Locale.ROOT, "%02d:%02d", minute / 60, minute % 60),
           R.drawable.ic_ui2_box,
           () ->
-              new TimePickerDialog(
-                      this,
-                      (picker, h, m) -> {
-                        prefs.edit().putInt("minute", h * 60 + m).commit();
-                        render();
-                      },
-                      minute / 60,
-                      minute % 60,
-                      true)
-                  .show());
+              MiuixPickersKt.pickTime(
+                  this,
+                  t("每天时间", "Daily time"),
+                  minute,
+                  value -> {
+                    prefs.edit().putInt("minute", value).commit();
+                    render();
+                  }));
     } else if ("interval".equals(mode)) {
       settings.arrow(
           t("间隔小时", "Interval in hours"),
           String.valueOf(prefs.getInt("hours", 24)),
           R.drawable.ic_ui2_box,
-          () -> {
-            EditText hours = new EditText(this);
-            hours.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-            hours.setText(String.valueOf(prefs.getInt("hours", 24)));
-            var dialog =
-                new DshaDialogBuilder(this)
-                    .setTitle(t("间隔 1–168 小时", "Interval: 1–168 hours"))
-                    .setView(hours)
-                    .setPositiveButton(t("保存", "Save"), null)
-                    .setNegativeButton(t("取消", "Cancel"), null)
-                    .create();
-            dialog.setOnShowListener(
-                d ->
-                    dialog
-                        .getButton(-1)
-                        .setOnClickListener(
-                            v -> {
-                              try {
-                                int value = Integer.parseInt(hours.getText().toString());
-                                if (value < 1 || value > 168) throw new NumberFormatException();
-                                prefs.edit().putInt("hours", value).commit();
-                                dialog.dismiss();
-                                render();
-                              } catch (NumberFormatException invalid) {
-                                hours.setError(t("请输入 1–168", "Enter 1–168"));
-                              }
-                            }));
-            dialog.show();
-          });
+          () ->
+              MiuixPickersKt.pickNumber(
+                  this,
+                  t("间隔时间", "Interval"),
+                  1,
+                  168,
+                  prefs.getInt("hours", 24),
+                  t("小时", "hours"),
+                  value -> {
+                    prefs.edit().putInt("hours", value).commit();
+                    render();
+                  }));
     }
     settings.text(
             t(

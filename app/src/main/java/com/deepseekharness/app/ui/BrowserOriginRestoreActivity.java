@@ -23,7 +23,7 @@ public final class BrowserOriginRestoreActivity extends AppCompatActivity {
 
   private volatile BrowserOriginRestoreServer server;
   private Surface surface;
-  private TextView status;
+  private MiuixText status;
   private String authUrl;
   private String ticket;
   private LinearLayout container;
@@ -33,8 +33,10 @@ public final class BrowserOriginRestoreActivity extends AppCompatActivity {
     super.onCreate(state);
     container = new LinearLayout(this);
     container.setOrientation(LinearLayout.VERTICAL);
-    status = new TextView(this);
-    status.setPadding(20, 20, 20, 20);
+    container.setBackgroundColor(getColor(com.deepseekharness.app.R.color.surface));
+    container.addView(
+        PageBarKt.pageBar(this, UiText.choose("恢复网页数据", "Restore web data"), this::finish));
+    status = new MiuixText(this);
     container.addView(status);
     setContentView(container);
     authUrl = getIntent().getStringExtra("current-auth-url");

@@ -31,7 +31,10 @@ fun pageBar(
   onBack: Runnable,
   actionLabel: String? = null,
   onAction: Runnable? = null,
-): ComposeView = ComposeView(context).apply { bindPageBar(this, title, onBack, actionLabel, onAction) }
+  action2Label: String? = null,
+  onAction2: Runnable? = null,
+): ComposeView =
+  ComposeView(context).apply { bindPageBar(this, title, onBack, actionLabel, onAction, action2Label, onAction2) }
 
 @JvmOverloads
 fun bindPageBar(
@@ -40,6 +43,8 @@ fun bindPageBar(
   onBack: Runnable,
   actionLabel: String? = null,
   onAction: Runnable? = null,
+  action2Label: String? = null,
+  onAction2: Runnable? = null,
 ) {
   view.setContent {
     HydshTheme {
@@ -56,16 +61,17 @@ fun bindPageBar(
           }
         },
         actions = {
-          if (actionLabel != null && onAction != null)
-            Text(
-              text = actionLabel,
-              modifier =
-                Modifier.clip(RoundedCornerShape(12.dp))
-                  .clickable { onAction.run() }
-                  .padding(horizontal = 12.dp, vertical = 10.dp),
-              color = MiuixTheme.colorScheme.primary,
-              fontSize = 16.sp,
-            )
+          for ((label, action) in listOf(actionLabel to onAction, action2Label to onAction2))
+            if (label != null && action != null)
+              Text(
+                text = label,
+                modifier =
+                  Modifier.clip(RoundedCornerShape(12.dp))
+                    .clickable { action.run() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                color = MiuixTheme.colorScheme.primary,
+                fontSize = 16.sp,
+              )
         },
       )
     }

@@ -16,7 +16,7 @@ import com.deepseekharness.app.util.UiText;
 /** 社区内容使用真实网站；独立 WebView 不注入本机桥、模型凭据或文件访问能力。 */
 public final class CommunityActivity extends AppCompatActivity {
   private WebView browser;
-  private TextView status;
+  private MiuixText status;
   private boolean pageFailed;
 
   @android.annotation.SuppressLint("SetJavaScriptEnabled")
@@ -33,9 +33,7 @@ public final class CommunityActivity extends AppCompatActivity {
             this::leave,
             UiText.choose("重试", "Retry"),
             () -> browser.loadUrl(com.deepseekharness.app.util.Constants.SITE_URL)));
-    status = new TextView(this);
-    status.setPadding(16, 8, 16, 8);
-    status.setTextColor(getColor(R.color.text_muted));
+    status = new MiuixText(this);
     root.addView(status);
     browser = new WebView(this);
     browser.setBackgroundColor(getColor(R.color.surface));
