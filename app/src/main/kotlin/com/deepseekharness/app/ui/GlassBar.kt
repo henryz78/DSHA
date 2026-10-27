@@ -89,6 +89,12 @@ class BackdropSourceLayout @JvmOverloads constructor(context: Context, attrs: At
   var node: RenderNode? = null
     private set
 
+  // 容器位置变了（如顶部提示卡出现或收起）时让玻璃重新取样，否则折射内容会停在旧位置、上下错开。
+  override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
+    super.onLayout(changed, left, top, right, bottom)
+    if (changed) GlassBar.nodeVersion++
+  }
+
   override fun dispatchDraw(canvas: Canvas) {
     if (!capture || Build.VERSION.SDK_INT < 29 || !canvas.isHardwareAccelerated) {
       super.dispatchDraw(canvas)

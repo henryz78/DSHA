@@ -67,7 +67,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.deepseekharness.app.backup.BackupControl
-import com.deepseekharness.app.core.ConfigStore
 import com.deepseekharness.app.data.WorkspaceFileExports
 import com.deepseekharness.app.util.GuestPaths
 import com.deepseekharness.app.util.SensitiveData
@@ -279,6 +278,32 @@ class FilesModel : ViewModel() {
     reload(context)
   }
 
+  /** 依次尝试，打开第一个能读的目录（工作区还没建好时退到 Documents、主目录）。 */
+  fun openFirst(context: Context, candidates: List<String>) {
+    val app = context.applicationContext
+    val ticket = ++generation
+    loading = true
+    worker.execute {
+      var opened: Pair<String, List<FileEntry>>? = null
+      var failure: Throwable? = null
+      for (id in candidates) {
+        val result = runCatching { FileStore.list(app, id) }
+        result.onSuccess { opened = id to it }.onFailure { failure = it }
+        if (opened != null) break
+      }
+      main.post {
+        if (ticket != generation) return@post
+        loading = false
+        val (id, list) = opened ?: return@post run { message = failure?.let(FileStore::errorText) ?: "" }
+        if (dir.isNotEmpty() && dir != id) history.add(dir)
+        if (dir != id) selected = emptySet()
+        dir = id
+        entries = list
+        if (!busy) message = ""
+      }
+    }
+  }
+
   fun reload(context: Context) {
     val app = context.applicationContext
     val target = dir
@@ -362,7 +387,7 @@ class FilesFragment : Fragment(), OwnTopBar {
 
   override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, saved: Bundle?): View {
     model = ViewModelProvider(this)[FilesModel::class.java]
-    if (model.dir.isEmpty()) model.open(requireContext(), home(requireContext()), false)
+    if (model.dir.isEmpty()) model.openFirst(requireContext(), WORKSPACE_CANDIDATES)
     requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, back)
     return composePage(requireContext()) {
       SideEffect { updateBack() }
@@ -386,9 +411,12 @@ class FilesFragment : Fragment(), OwnTopBar {
     back.isEnabled = isResumed && (model.selected.isNotEmpty() || model.history.isNotEmpty())
   }
 
-  fun home(context: Context): String =
-    runCatching { WorkspaceDocumentIds.forGuestDirectory(ConfigStore(context).workdir) }
-      .getOrDefault(GuestPaths.ROOT_RELATIVE + "/root")
+  companion object {
+    /** DSH 实际的默认工作区（启动时 DSHA_WORKSPACE_DOCUMENTS=/root/Documents），没有时依次退回。 */
+    val WORKSPACE = GuestPaths.ROOT_RELATIVE + "/root/Documents/deepseek-harness/default-workspace"
+    val WORKSPACE_CANDIDATES =
+      listOf(WORKSPACE, GuestPaths.ROOT_RELATIVE + "/root/Documents", GuestPaths.ROOT_RELATIVE + "/root")
+  }
 
   fun openEntry(e: FileEntry) {
     val context = requireContext()
@@ -573,7 +601,6 @@ private fun FilesScreen(model: FilesModel, page: FilesFragment) {
       shown.sortedWith(compareBy<FileEntry> { !it.directory }.then(order))
     }
   val barInset = with(LocalDensity.current) { GlassBar.contentBottomPx.toDp() }
-  val home = remember { page.home(context) }
 
   Box(Modifier.fillMaxSize()) {
     HyPage(
@@ -619,11 +646,13 @@ private fun FilesScreen(model: FilesModel, page: FilesFragment) {
         ) {
           for ((label, id) in
             listOf(
-              t("工作目录", "Workspace") to home,
+              t("工作目录", "Workspace") to FilesFragment.WORKSPACE,
               t("主目录", "Home") to GuestPaths.ROOT_RELATIVE + "/root",
               t("根目录", "Root") to GuestPaths.ROOT_RELATIVE,
               t("应用数据", "App data") to "root",
-            )) Chip(label, model.dir == id) { model.open(context, id) }
+            )) Chip(label, model.dir == id) {
+              if (id == FilesFragment.WORKSPACE) model.openFirst(context, FilesFragment.WORKSPACE_CANDIDATES) else model.open(context, id)
+            }
         }
       }
       if (model.message.isNotEmpty() || model.busy)
