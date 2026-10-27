@@ -1,6 +1,19 @@
 package com.deepseekharness.app.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.runtime.LaunchedEffect
@@ -31,6 +44,49 @@ class MainChrome {
   var title by mutableStateOf("HYDSH")
   var back by mutableStateOf(false)
   var tab by mutableIntStateOf(R.id.nav_launch)
+
+  /** 顶部提示卡：0 不显示；1 维护任务进行中；2 需要处理（受限模式 / 启动未完成）。 */
+  var bannerKind by mutableIntStateOf(0)
+  var bannerTitle by mutableStateOf("")
+  var bannerSummary by mutableStateOf("")
+
+  fun attachBanner(view: ComposeView, onClick: Runnable) {
+    view.setContent {
+      HydshTheme {
+        AnimatedVisibility(
+          visible = bannerKind != 0,
+          enter = expandVertically() + fadeIn(),
+          exit = shrinkVertically() + fadeOut(),
+        ) {
+          Card(modifier = Modifier.padding(horizontal = 12.dp).padding(top = 8.dp, bottom = 4.dp)) {
+            val colors = MiuixTheme.colorScheme
+            if (bannerKind == 1)
+              BasicComponent(
+                title = bannerTitle,
+                summary = bannerSummary,
+                startAction = { HyIcon(R.drawable.ic_ui_tasks) },
+                endActions = { InfiniteProgressIndicator(color = colors.primary) },
+                onClick = onClick::run,
+              )
+            else
+              ArrowPreference(
+                title = bannerTitle,
+                summary = bannerSummary,
+                startAction = {
+                  Icon(
+                    ImageVector.vectorResource(R.drawable.ic_ui_shield),
+                    contentDescription = null,
+                    modifier = Modifier.padding(end = 16.dp).size(26.dp),
+                    tint = colors.error,
+                  )
+                },
+                onClick = onClick::run,
+              )
+          }
+        }
+      }
+    }
+  }
 
   fun attachTopBar(view: ComposeView, onBack: Runnable, onTasks: Runnable) {
     view.setContent {
@@ -92,8 +148,9 @@ class MainChrome {
       listOf(
         Triple(R.id.nav_launch, R.drawable.ic_launch, R.string.ui_m0005),
         Triple(R.id.nav_plugins, R.drawable.ic_plugins, R.string.ui_m0016),
-        Triple(R.id.nav_settings, R.drawable.ic_settings, R.string.ui_m0023),
+        Triple(R.id.nav_files, R.drawable.ic_files, R.string.ui_tab_files),
         Triple(R.id.nav_terminal, R.drawable.ic_terminal, R.string.ui_m0021),
+        Triple(R.id.nav_settings, R.drawable.ic_settings, R.string.ui_m0023),
       )
   }
 }

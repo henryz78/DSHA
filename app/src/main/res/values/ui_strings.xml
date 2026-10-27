@@ -213,4 +213,5 @@
 
     <string name="ui_m0217" formatted="false">"验证已有连接"</string>
     <string name="ui_m0218" formatted="false">"＋ 新建"</string>
+    <string name="ui_tab_files" formatted="false">"文件"</string>
 </resources>

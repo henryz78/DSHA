@@ -41,10 +41,17 @@ class StorageActivity : AppCompatActivity() {
             HySection {
               HyKv(t("工作目录", "Workspace"), workdir)
               ArrowPreference(
-                title = t("作品与文件导出", "Work file export"),
-                summary = t("浏览工作区 · 保存到手机 · 分享", "Browse workspace · Save · Share"),
+                title = t("文件", "Files"),
+                summary = t("浏览、编辑、导入导出 · 已移到底部「文件」标签", "Browse, edit, import and export · Now in the Files tab"),
                 startAction = { HyIcon(R.drawable.ic_ui2_folder) },
-                onClick = { startActivity(android.content.Intent(this@StorageActivity, WorkspaceFilesActivity::class.java)) },
+                onClick = {
+                  startActivity(
+                    android.content.Intent(this@StorageActivity, MainActivity::class.java)
+                      .putExtra("open_files", true)
+                      .addFlags(android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                  )
+                  finish()
+                },
               )
               ArrowPreference(
                 title = t("文件共享", "File sharing"),

@@ -249,8 +249,7 @@ public class MainActivity extends AppCompatActivity {
     if (mainReady || isFinishing() || isDestroyed()) return;
     mainReady = true;
     dismissEntryOverlay(0);
-    TextView recovery = findViewById(R.id.environment_recovery_banner);
-    recovery.setOnClickListener(
+    android.view.View.OnClickListener recovery =
         v -> {
           if (com.deepseekharness.app.core.BackupTask.get(this).maintenanceBusy()
               || BackgroundTasksActivity.busy(this)) BackgroundTasksActivity.open(this);
@@ -258,7 +257,7 @@ public class MainActivity extends AppCompatActivity {
               || EnvironmentUiStatus.get(this).repairs)
             startActivity(new Intent(this, StartupRecoveryActivity.class));
           else startActivity(new Intent(this, ExtractActivity.class).putExtra("review_only", true));
-        });
+        };
     String pendingLink =
         getSharedPreferences("dsha-install-link", MODE_PRIVATE).getString("pending", "");
     if (!pendingLink.isEmpty()
@@ -279,6 +278,7 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.app_bar),
         () -> getOnBackPressedDispatcher().onBackPressed(),
         () -> BackgroundTasksActivity.open(this));
+    chrome.attachBanner(findViewById(R.id.environment_recovery_banner), () -> recovery.onClick(null));
     pager = findViewById(R.id.main_pager);
     pages = new MainPages(this, this::tabKind, this::createTab);
     pages.attach(pager);
@@ -381,7 +381,8 @@ public class MainActivity extends AppCompatActivity {
       }
       return f;
     }
-    if (position == 2) return new SettingsFragment();
+    if (position == 2) return new FilesFragment();
+    if (position == 4) return new SettingsFragment();
     // 终端：默认挂真 PTY 页（vim/htop/tmux 能跑），可在 PTY 页切回简易版
     if (recovery) return new EnvironmentRecoveryFragment();
     return PtyTerminalFragment.preferred(this) ? new PtyTerminalFragment() : new TerminalFragment();
@@ -532,6 +533,10 @@ public class MainActivity extends AppCompatActivity {
       return;
     }
     if (intent.getBooleanExtra("open_plugins", false)) selectTab(R.id.nav_plugins);
+    if (intent.getBooleanExtra("open_files", false)) {
+      intent.removeExtra("open_files");
+      selectTab(R.id.nav_files);
+    }
     if (intent.getBooleanExtra("open_launch", false)) {
       intent.removeExtra("open_launch");
       selectTab(R.id.nav_launch);
@@ -834,8 +839,7 @@ public class MainActivity extends AppCompatActivity {
       new Runnable() {
         @Override
         public void run() {
-          TextView banner = findViewById(R.id.environment_recovery_banner);
-          if (banner == null || isFinishing()) return;
+          if (isFinishing()) return;
           HarnessController controller = HarnessController.get(MainActivity.this);
           boolean startupRecovery =
               controller.config().isStartupRecoveryRequested()
@@ -843,27 +847,7 @@ public class MainActivity extends AppCompatActivity {
           boolean limited = EnvironmentUiStatus.get(MainActivity.this).recovery;
           boolean busy =
               com.deepseekharness.app.core.BackupTask.get(MainActivity.this).maintenanceBusy();
-          banner.setVisibility(
-              limited || busy || startupRecovery
-                  ? android.view.View.VISIBLE
-                  : android.view.View.GONE);
-          banner.setText(
-              busy
-                  ? com.deepseekharness.app.util.UiText.text("环境维护进行中 · 点击查看进度")
-                  : limited
-                      ? com.deepseekharness.app.util.UiText.text("受限模式：环境需要恢复 · 点击处理")
-                      : com.deepseekharness.app.util.UiText.choose(
-                          "启动未完成 · 点击查看恢复选项", "Startup did not complete · View recovery options"));
-          com.deepseekharness.app.util.BackupTaskState.Snapshot task =
-              com.deepseekharness.app.core.BackupTask.get(MainActivity.this).snapshot();
-          if (busy && task.busy())
-            banner.setText(
-                com.deepseekharness.app.util.UiText.format(
-                    "%s · 点击查看进度",
-                    (task.status == com.deepseekharness.app.util.BackupTaskState.Status.PREVIEW
-                        ? com.deepseekharness.app.util.UiText.choose(
-                            "等待确认恢复备份", "Backup restore awaiting confirmation")
-                        : com.deepseekharness.app.util.StartupText.render(task.kind))));
+          if (chrome != null) showBanner(busy, limited, startupRecovery);
           String key =
               controller.startupDiagnostics().recordId()
                   + ":"
@@ -889,6 +873,45 @@ public class MainActivity extends AppCompatActivity {
           recoveryHandler.postDelayed(this, 1000);
         }
       };
+
+  /** 顶部提示卡的三种情况：维护任务进行中 > 受限模式 > 上次启动未完成。点击行为见 showMain。 */
+  private void showBanner(boolean busy, boolean limited, boolean startupRecovery) {
+    if (busy) {
+      com.deepseekharness.app.util.BackupTaskState.Snapshot task =
+          com.deepseekharness.app.core.BackupTask.get(this).snapshot();
+      boolean preview =
+          task.busy() && task.status == com.deepseekharness.app.util.BackupTaskState.Status.PREVIEW;
+      String name =
+          task.busy()
+              ? com.deepseekharness.app.util.BackupTaskKinds.display(
+                  task.kind, "en".equals(com.deepseekharness.app.util.UiText.language()))
+              : null;
+      if (name == null && task.busy() && task.kind != null && !task.kind.isEmpty())
+        name = com.deepseekharness.app.util.StartupText.render(task.kind);
+      chrome.setBannerKind(1);
+      chrome.setBannerTitle(
+          preview
+              ? com.deepseekharness.app.util.UiText.choose("等待确认恢复备份", "Restore awaiting confirmation")
+              : name != null
+                  ? name
+                  : com.deepseekharness.app.util.UiText.choose("环境维护进行中", "Maintenance in progress"));
+      chrome.setBannerSummary(
+          preview
+              ? com.deepseekharness.app.util.UiText.choose("点击查看并确认", "Tap to review and confirm")
+              : com.deepseekharness.app.util.UiText.choose("正在进行 · 点击查看进度", "Running · Tap to view progress"));
+    } else if (limited) {
+      chrome.setBannerKind(2);
+      chrome.setBannerTitle(com.deepseekharness.app.util.UiText.choose("环境需要恢复", "Environment needs recovery"));
+      chrome.setBannerSummary(
+          com.deepseekharness.app.util.UiText.choose(
+              "部分功能暂不可用 · 点击处理", "Some features are unavailable · Tap to fix"));
+    } else if (startupRecovery) {
+      chrome.setBannerKind(2);
+      chrome.setBannerTitle(com.deepseekharness.app.util.UiText.choose("上次启动未完成", "Last startup did not finish"));
+      chrome.setBannerSummary(
+          com.deepseekharness.app.util.UiText.choose("点击查看恢复选项", "Tap to view recovery options"));
+    } else chrome.setBannerKind(0);
+  }
 
   @Override
   protected void onSaveInstanceState(Bundle state) {

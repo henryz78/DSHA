@@ -82,7 +82,8 @@
         <activity android:name=".ui.AgentTasksActivity" android:exported="false" />
         <receiver android:name=".AgentTaskStopReceiver" android:exported="false" />
         <activity android:name=".ui.NativeDataActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ui.WorkspaceFilesActivity" android:exported="false" />
+        <!-- 旋转不重建，未保存的编辑内容留在内存里。 -->
+        <activity android:name=".ui.FileEditorActivity" android:exported="false" android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden" />
           <activity android:name=".ui.StorageHelpActivity" android:exported="false" />
           <activity android:name=".ui.ColdSetupSpeedActivity" android:exported="false" />
         <activity android:name=".ui.SkillsActivity" android:exported="false" />

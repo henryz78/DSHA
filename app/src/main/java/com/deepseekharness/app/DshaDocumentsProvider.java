@@ -377,6 +377,38 @@ public class DshaDocumentsProvider extends DocumentsProvider {
     }
   }
 
+  /** 跨目录移动：与重命名同一条 NOFOLLOW 改名路径，链接本身移动、不复制目标。 */
+  @Override
+  public synchronized String moveDocument(String id, String sourceParent, String targetParent)
+      throws FileNotFoundException {
+    try (RuntimeTasks ignored = lease(false)) {
+      if (paths.anchor(id))
+        throw new IOException(
+            com.deepseekharness.app.util.UiText.choose("环境入口目录不能移动", "Environment entry folders cannot be moved"));
+      if (!paths.parent(id).equals(paths.parent(paths.child(sourceParent, new File(id).getName()))))
+        throw new IOException("MOVE_SOURCE_PARENT");
+      String next = paths.child(targetParent, new File(id).getName());
+      if (next.equals(id)) return id;
+      String from = paths.relative(id), to = paths.relative(next);
+      if (to.startsWith(from + "/"))
+        throw new IOException(
+            com.deepseekharness.app.util.UiText.choose("不能移动到自身内部", "Cannot move a folder into itself"));
+      if (!existing(targetParent).isDirectory())
+        throw new IOException(com.deepseekharness.app.util.UiText.text("所选文档不是目录"));
+      File source = resolve(id, false), target = resolve(next, false);
+      if (target.exists() || link(target) != null)
+        throw new IOException(com.deepseekharness.app.util.UiText.text("已存在同名文件"));
+      List<String> oldIds = descendants(id);
+      mutations.move(source, target);
+      for (String old : oldIds) if (!old.equals(id)) revokeDocumentPermission(old);
+      changed(id);
+      changed(next);
+      return next;
+    } catch (IOException error) {
+      throw failure(error);
+    }
+  }
+
   @Override
   public synchronized void deleteDocument(String id) throws FileNotFoundException {
     try (RuntimeTasks ignored = lease(false)) {
@@ -443,7 +475,8 @@ public class DshaDocumentsProvider extends DocumentsProvider {
     if (!paths.anchor(id) && entry.getParentFile().canWrite())
       flags |=
           DocumentsContract.Document.FLAG_SUPPORTS_DELETE
-              | DocumentsContract.Document.FLAG_SUPPORTS_RENAME;
+              | DocumentsContract.Document.FLAG_SUPPORTS_RENAME
+              | DocumentsContract.Document.FLAG_SUPPORTS_MOVE;
     if (file.canWrite())
       flags |=
           file.isDirectory()

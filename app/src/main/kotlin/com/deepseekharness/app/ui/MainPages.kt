@@ -14,7 +14,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.utils.PagerNavigationSpringSpec
 
 /**
- * 主界面四个标签页放在 ViewPager2 里：切换时像 miuix 官方示例一样左右平移，途经中间的页面，
+ * 主界面五个标签页放在 ViewPager2 里：切换时像 miuix 官方示例一样左右平移，途经中间的页面，
  * 用的也是官方翻页的弹簧参数。手指左右滑不翻页（终端、插件页里有横向手势）。
  *
  * 插件页和终端页在环境需要修复时换成修复页，终端页还分 PTY 和简易版；
@@ -58,7 +58,7 @@ class MainPages(
   /** 接到 ViewPager2 上：禁用手指翻页，并记录当前滚动位置（动画中途改目标时从这里接着走）。 */
   fun attach(pager: ViewPager2) {
     pager.isUserInputEnabled = false
-    // 四页一开始就全部建好：否则滑动途中才去建插件页、设置页，那一帧卡住，动画就直接跳到终点。
+    // 所有页一开始就全部建好：否则滑动途中才去建插件页、设置页，那一帧卡住，动画就直接跳到终点。
     pager.offscreenPageLimit = COUNT - 1
     pager.adapter = this
     position = pager.currentItem.toFloat()
@@ -120,15 +120,16 @@ class MainPages(
   }
 
   companion object {
-    const val COUNT = 4
+    const val COUNT = 5
     private val scope = CoroutineScope(AndroidUiDispatcher.Main)
 
     @JvmStatic
     fun index(tab: Int) =
       when (tab) {
         R.id.nav_plugins -> 1
-        R.id.nav_settings -> 2
+        R.id.nav_files -> 2
         R.id.nav_terminal -> 3
+        R.id.nav_settings -> 4
         else -> 0
       }
 
@@ -136,8 +137,9 @@ class MainPages(
     fun tab(index: Int) =
       when (index) {
         1 -> R.id.nav_plugins
-        2 -> R.id.nav_settings
+        2 -> R.id.nav_files
         3 -> R.id.nav_terminal
+        4 -> R.id.nav_settings
         else -> R.id.nav_launch
       }
   }

@@ -389,7 +389,6 @@
     "app/src/main/java/com/deepseekharness/app/ui/WebUploads.java",
     "app/src/main/java/com/deepseekharness/app/ui/WebViewMicrophone.java",
     "app/src/main/java/com/deepseekharness/app/ui/WelcomeActivity.java",
-    "app/src/main/java/com/deepseekharness/app/ui/WorkspaceFilesActivity.java",
     "app/src/main/java/com/deepseekharness/app/ui/WorkspaceFragment.java",
     "app/src/main/java/com/deepseekharness/app/util/AccessibilityDumpBounds.java",
     "app/src/main/java/com/deepseekharness/app/util/AccessibilityEnableList.java",

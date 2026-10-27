@@ -469,6 +469,8 @@ public class LaunchFragment extends Fragment implements OwnTopBar {
       environmentRecovery = EnvironmentUiStatus.get(requireContext()).recovery;
       if (environmentRecovery) {
         state.setRunState(UiText.text("环境需要恢复"));
+        state.setSubtitle(
+            UiText.choose("先在下方「环境维护」里处理，完成后才能启动。", "Fix it under Environment maintenance below before starting."));
         state.setStartEnabled(false);
         state.setRestartEnabled(false);
         state.setSafeEnabled(false);
