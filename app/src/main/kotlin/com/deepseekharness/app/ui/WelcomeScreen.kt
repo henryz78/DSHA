@@ -3,7 +3,11 @@ package com.deepseekharness.app.ui
 import android.content.Context
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -147,18 +151,25 @@ private fun Slide(slide: WelcomeSlide, first: Boolean) {
   Column(Modifier.fillMaxSize().overScrollVertical().verticalScroll(rememberScrollState()).padding(vertical = 8.dp)) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 24.dp)) {
       Text(stringResource(slide.eyebrow), color = colors.primary, fontSize = 12.sp, letterSpacing = 1.8.sp)
-      Box(
-        Modifier.padding(top = if (first) 40.dp else 20.dp)
-          .size(if (first) 96.dp else 56.dp)
-          .clip(RoundedCornerShape(if (first) 28.dp else 16.dp))
-          .background(colors.primary.copy(alpha = 0.14f))
-          .align(if (first) Alignment.CenterHorizontally else Alignment.Start),
+      if (first)
+        Image(
+          painterResource(R.drawable.hydsh_banner),
+          contentDescription = null,
+          modifier = Modifier.padding(top = 24.dp).fillMaxWidth().aspectRatio(3f).clip(RoundedCornerShape(20.dp)),
+          contentScale = ContentScale.Crop,
+          alignment = Alignment.CenterEnd,
+        )
+      else Box(
+        Modifier.padding(top = 20.dp)
+          .size(56.dp)
+          .clip(RoundedCornerShape(16.dp))
+          .background(colors.primary.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center,
       ) {
         Icon(
           ImageVector.vectorResource(slide.icon),
           contentDescription = null,
-          modifier = Modifier.size(if (first) 48.dp else 30.dp),
+          modifier = Modifier.size(30.dp),
           tint = colors.primary,
         )
       }

@@ -156,14 +156,14 @@ def verifyPublishCertificate = tasks.register("verifyPublishCertificate") {
     doLast {
         def signing = android.signingConfigs.publish
         if (signing.storeFile == null || !signing.storeFile.isFile())
-            throw new GradleException("正式 APK 缺少历史 E7E3 发布密钥，停止打包")
+            throw new GradleException("正式 APK 缺少 HYDSH 发布密钥，停止打包")
         def store = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType())
         signing.storeFile.withInputStream { store.load(it, signing.storePassword.toCharArray()) }
         def certificate = store.getCertificate(signing.keyAlias)
         def expected = new groovy.json.JsonSlurper().parse(rootProject.file('ci/release-identity.json')).certificateSha256
         if (certificate == null || java.security.MessageDigest.getInstance("SHA-256")
                 .digest(certificate.encoded).encodeHex().toString() != expected)
-            throw new GradleException("发布证书不是历史 E7E3，停止打包")
+            throw new GradleException("发布证书与 ci/release-identity.json 不符，停止打包")
     }
 }
 tasks.configureEach {

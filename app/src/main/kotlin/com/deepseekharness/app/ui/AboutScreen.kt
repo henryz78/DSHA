@@ -60,20 +60,11 @@ private fun AboutScreen(actions: AboutActions) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
-        Box(
-          modifier =
-            Modifier.size(72.dp)
-              .clip(RoundedCornerShape(20.dp))
-              .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)),
-          contentAlignment = Alignment.Center,
-        ) {
-          Icon(
-            ImageVector.vectorResource(R.drawable.ic_ui2_prompt),
-            contentDescription = null,
-            modifier = Modifier.size(38.dp),
-            tint = MiuixTheme.colorScheme.primary,
-          )
-        }
+        androidx.compose.foundation.Image(
+          androidx.compose.ui.res.painterResource(R.drawable.dsha_brand),
+          contentDescription = null,
+          modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)),
+        )
         Text("HYDSH", fontSize = 28.sp, fontWeight = FontWeight.Bold)
         Text(
           text = "DeepSeek Harness for Android\n${BuildConfig.VERSION_NAME} · ${BuildConfig.VERSION_CODE}",
