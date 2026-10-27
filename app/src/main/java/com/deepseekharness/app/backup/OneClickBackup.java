@@ -169,6 +169,7 @@ public final class OneClickBackup extends AndroidViewModel {
                 context.getFilesDir().getCanonicalFile()),
             android.os.Environment.getExternalStorageDirectory().getCanonicalFile(),
             new ConfigStore(context).getWorkdir());
+    selection.includeApiKey = includesApiKey(context);
     control.check();
     NativeBackupJobs owner = NativeBackupJobs.get(context);
     jobs = owner;
@@ -181,6 +182,23 @@ public final class OneClickBackup extends AndroidViewModel {
       job = started;
       if (control.isCancelled()) owner.cancelIfCurrent(started.id);
     }
+  }
+
+  private static final String INCLUDE_KEY = "backup_include_api_key";
+
+  /** 一键备份是否带上 API Key：带上后恢复就不用重填，但密钥会以明文进到备份文件里。默认不带。 */
+  public static boolean includesApiKey(Context context) {
+    return context
+        .getSharedPreferences(com.deepseekharness.app.util.Constants.PREFS, Context.MODE_PRIVATE)
+        .getBoolean(INCLUDE_KEY, false);
+  }
+
+  public static void setIncludesApiKey(Context context, boolean on) {
+    context
+        .getSharedPreferences(com.deepseekharness.app.util.Constants.PREFS, Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean(INCLUDE_KEY, on)
+        .apply();
   }
 
   static NativeDataLocations.Selection selection(

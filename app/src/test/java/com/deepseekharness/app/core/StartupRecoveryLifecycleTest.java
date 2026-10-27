@@ -133,7 +133,7 @@ public final class StartupRecoveryLifecycleTest {
   private ScheduledExecutorService history;
   private StartupRecoveryModel model;
   private StartupRecoveryActivity activity;
-  private TextView progress;
+  private com.deepseekharness.app.ui.HyLine progress;
   private Runnable refresh;
 
   public static final class NativeMain extends MainActivity {
@@ -199,7 +199,7 @@ public final class StartupRecoveryLifecycleTest {
     Repairs.unreadable = false;
     model = new StartupRecoveryModel(app);
     activity = Robolectric.buildActivity(StartupRecoveryActivity.class).get();
-    progress = new TextView(app);
+    progress = new com.deepseekharness.app.ui.HyLine();
     field(activity, "progress", progress);
     field(activity, "model", model);
     refresh = (Runnable) field(activity, "refresh");

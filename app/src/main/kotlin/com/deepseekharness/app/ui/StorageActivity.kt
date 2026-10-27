@@ -41,6 +41,12 @@ class StorageActivity : AppCompatActivity() {
             HySection {
               HyKv(t("工作目录", "Workspace"), workdir)
               ArrowPreference(
+                title = t("作品与文件导出", "Work file export"),
+                summary = t("浏览工作区 · 保存到手机 · 分享", "Browse workspace · Save · Share"),
+                startAction = { HyIcon(R.drawable.ic_ui2_folder) },
+                onClick = { startActivity(android.content.Intent(this@StorageActivity, WorkspaceFilesActivity::class.java)) },
+              )
+              ArrowPreference(
                 title = t("文件共享", "File sharing"),
                 summary = t("通过系统文件选择器或 MT 管理器访问 HYDSH", "Access HYDSH from the system file picker or MT Manager"),
                 startAction = { HyIcon(R.drawable.ic_ui2_box) },

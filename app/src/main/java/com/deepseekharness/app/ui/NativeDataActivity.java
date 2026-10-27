@@ -145,7 +145,7 @@ public final class NativeDataActivity extends AppCompatActivity {
                 ? t("数据导出", "Data export")
                 : restoreOnly
                     ? t("从备份恢复", "Restore a backup")
-                    : t("应用数据与救援", "Application data and recovery");
+                    : t("高级备份与救援", "Advanced backup and rescue");
     var model = new HyScreenModel(heading);
     model.note(
         backupMode
@@ -205,14 +205,7 @@ public final class NativeDataActivity extends AppCompatActivity {
       actions.button(
           t("导入备份", "Import backup"),
           restoreOnly,
-          () ->
-              restorePicker.launch(
-                  new String[] {
-                    com.deepseekharness.app.util.BackupFileNames.MIME_TYPE,
-                    "application/octet-stream",
-                    "application/gzip",
-                    "*/*"
-                  }));
+          this::pickRestore);
     if (!exportOnly && !restoreOnly && !backupMode)
       actions.arrow(t("重新导出已验证副本", "Export a verified copy again"), "", this::verifiedCopies);
     if (backupMode)
@@ -258,7 +251,10 @@ public final class NativeDataActivity extends AppCompatActivity {
       maintenance.arrow(t("回退兼容运行时", "Roll back compatible runtime"), "", () -> RuntimeRecoveryUi.show(this));
     }
     setContentView(HyScreenKt.hyScreen(this, model, true));
+    // 从备份页的“从备份恢复”进来：直接打开文件选择。
+    if (saved == null && getIntent().getBooleanExtra("pick", false)) pickRestore();
     jobs.changes().observe(this, this::render);
+    RestoreAutoApply.progress().observe(this, text -> render(jobs.changes().getValue()));
     pending.preview.observe(
         this,
         value -> {
@@ -643,6 +639,16 @@ public final class NativeDataActivity extends AppCompatActivity {
     dialog.show();
   }
 
+  private void pickRestore() {
+    restorePicker.launch(
+        new String[] {
+          com.deepseekharness.app.util.BackupFileNames.MIME_TYPE,
+          "application/octet-stream",
+          "application/gzip",
+          "*/*"
+        });
+  }
+
   private void restorePassword(Uri uri) {
     restorePassword(uri, null);
   }
@@ -698,8 +704,8 @@ public final class NativeDataActivity extends AppCompatActivity {
     if (jobs.state().busy) return;
     LinearLayout content = new LinearLayout(this);
     content.setOrientation(LinearLayout.VERTICAL);
-    content.setPadding(dp(20), 0, dp(20), 0);
-    TextView description = new TextView(this);
+    MiuixText description = new MiuixText(this);
+    description.setTone(1);
     description.setText(
         needsOriginal
             ? t(
@@ -714,22 +720,23 @@ public final class NativeDataActivity extends AppCompatActivity {
       password.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
       password.setSaveEnabled(false);
       password.setHint(t("旧备份原密码", "Original password of the old backup"));
-      content.addView(password);
+      LinearLayout.LayoutParams field = new LinearLayout.LayoutParams(-1, -2);
+      field.setMargins(dp(20), 0, dp(20), 0);
+      content.addView(password, field);
     }
-    CheckBox include = new CheckBox(this);
-    include.setText(
-        t("恢复原生 API Key（默认保留本机凭据）", "Restore native API key (keep local credentials by default)"));
-    content.addView(include);
-    TextView destinationLabel = new TextView(this);
-    destinationLabel.setText(
-        t("项目恢复位置（创建新的独立目录）", "Project destination (creates a new separate directory)"));
-    content.addView(destinationLabel);
-    Spinner projectDestination =
-        choice(
-            new String[] {
-              t("应用私有项目区", "App-private projects"), t("容器主目录 /root", "Container home /root")
-            });
-    content.addView(projectDestination);
+    // 默认带回备份里的 API Key；备份里没有时保留本机现有的。
+    MiuixSwitch include = new MiuixSwitch(this);
+    include.setText(t("恢复备份里的 API Key", "Restore the API key from the backup"));
+    include.setChecked(true);
+    LinearLayout.LayoutParams side = new LinearLayout.LayoutParams(-1, -2);
+    side.setMargins(dp(24), 0, dp(24), 0);
+    content.addView(include, side);
+    MiuixText destination = new MiuixText(this);
+    destination.setText(
+        t(
+            "项目文件恢复到容器里的 /root/restored-projects/，不会覆盖现有文件。",
+            "Project files are restored to /root/restored-projects/ in the container without overwriting existing files."));
+    content.addView(destination);
     ScrollView scroll = new ScrollView(this);
     scroll.addView(content);
     new DshaDialogBuilder(this)
@@ -738,8 +745,7 @@ public final class NativeDataActivity extends AppCompatActivity {
         .setPositiveButton(
             t("开始预检", "Inspect"),
             (d, w) -> {
-              String location =
-                  projectDestination.getSelectedItemPosition() == 0 ? "PRIVATE" : "GUEST_HOME";
+              String location = "GUEST_HOME";
               Set<String> selected = Set.of(selection().scope);
               boolean includeKey = include.isChecked();
               if (automatic) {
@@ -834,9 +840,17 @@ public final class NativeDataActivity extends AppCompatActivity {
     }
   }
 
+  /** 本页亲眼看到在跑的作业；只有它完成恢复时才自动应用，避免重开页面时对旧结果再做一遍。 */
+  private String watching = "";
+
   private void render(NativeBackupJobs.State value) {
     if (value == null) return;
     if (cancelOperation != null) cancelOperation.setVisible(value.busy);
+    if (value.busy) watching = value.id;
+    else if (value.id.equals(watching) && value.result.startsWith("DATA_RESTORED")) {
+      watching = "";
+      RestoreAutoApply.start(this, value.id);
+    }
     if (value.stage.equals("PREVIEW")) {
       restorePreview(value);
       return;
@@ -862,8 +876,8 @@ public final class NativeDataActivity extends AppCompatActivity {
                             "Best-effort rescue completed without an application-consistency guarantee.")
                         : value.result.startsWith("DATA_RESTORED_SETTINGS_REVIEW")
                             ? t(
-                                    "所选数据已保存。Profile 设置尚未应用：请进入「保留副本与旧树」逐个 profile 检查差异、选择字段并读回；插件和代码仍待审阅。",
-                                    "Selected data saved. Profile settings are pending: open Retained copies and old trees to inspect each profile, select fields and verify readback. Plugins and code still require review.")
+                                    "数据已恢复，设置和插件会自动恢复，见下方进度。",
+                                    "Data restored. Settings and plugins are restored automatically; see progress below.")
                                 + (value.result.contains("API_KEY")
                                     ? t(
                                         "\n原生 API Key 未恢复，请在 Web UI 中确认模型凭据。",
@@ -879,8 +893,8 @@ public final class NativeDataActivity extends AppCompatActivity {
                                         "Data restored; this backup did not include an API key. Configure model credentials in Web UI.")
                                     : value.result.equals("DATA_RESTORED_PLUGINS_QUARANTINED")
                                         ? t(
-                                            "数据已恢复，插件、可执行配置与待确认的自定义数据已隔离保存，尚未启用。",
-                                            "Data restored; plugins, executable configuration and unclassified custom data are quarantined and not enabled.")
+                                            "数据已恢复，插件会自动恢复并启用，见下方进度。",
+                                            "Data restored. Plugins are restored and enabled automatically; see progress below.")
                                         : value.result.startsWith("DATA_RESTORED")
                                             ? t(
                                                 "数据已恢复；运行兼容性仍需检查。",
@@ -896,14 +910,17 @@ public final class NativeDataActivity extends AppCompatActivity {
                                                         "The interrupted commit is consistent again; originals were retained.")
                                                     : stage(value.stage);
     String projection = com.deepseekharness.app.data.PortableSettings.errorCode(this);
+    String auto =
+        value.id.equals(RestoreAutoApply.task()) ? RestoreAutoApply.progress().getValue() : "";
     setStatus(
         com.deepseekharness.app.util.UiText.format(
-            "%s\n%s 项 · %s%s%s",
+            "%s\n%s 项 · %s%s%s%s",
             result,
             value.entries,
             com.deepseekharness.app.util.Fmt.bytes(value.bytes),
             value.error.isEmpty() ? "" : "\n" + errorText(value.error),
-            projection.isEmpty() ? "" : "\n" + errorText(projection)));
+            projection.isEmpty() ? "" : "\n" + errorText(projection),
+            auto == null || auto.isEmpty() ? "" : "\n\n" + auto));
   }
 
   private String errorText(String code) {

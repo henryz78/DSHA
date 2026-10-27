@@ -71,6 +71,8 @@ interface InstallActions {
 
   fun recovery()
 
+  fun resetConfig()
+
   fun tasks()
 }
 
@@ -148,6 +150,12 @@ fun installPage(context: Context, ui: InstallUi, actions: InstallActions): Compo
             summary = t("查看启动依赖与中断维护", "Startup dependencies and interrupted maintenance"),
             startAction = { HyIcon(R.drawable.ic_ui_shield) },
             onClick = actions::recovery,
+          )
+          ArrowPreference(
+            title = t("重置配置，保留对话", "Reset settings, keep conversations"),
+            summary = t("插件、对话和凭据保留；原配置可恢复", "Plugins, conversations and credentials are kept"),
+            startAction = { HyIcon(R.drawable.ic_recovery_wrench) },
+            onClick = actions::resetConfig,
           )
           ArrowPreference(
             title = t("首次安装测速", "First-install timing"),

@@ -315,10 +315,7 @@ def main():
             raise RuntimeError('Current managed DSH runtime fixture is unavailable; run tools/prepare-test-runtime.py: '+str(error)) from error
         run('plugin-upgrade-gate',[sys.executable,'-B','tools/verify-plugin-upgrade-gate.py',
                                    '--managed-runtime',managed_runtime,'--raw-runtime',locked_runtime,*apks])
-        run('recovery-apk',[sys.executable,'-B','tools/verify-recovery-apk.py',*apks])
-        run('recovery-browser-overlay',[args.node,'tools/test-recovery-browser-overlay.mjs',ROOT/'app/build/generated/recoveryAssets'])
         run('web-ui-host-fixtures',[args.node,'tools/test-web-ui-host-fixtures.mjs'])
-        run('recovery-profile-boot',[args.node,'tools/test-recovery-profile-boot.mjs'],{'DSHA_TEST_RUNTIME':str(locked_runtime)})
         run('mobile-modal',[args.node,'tools/test-mobile-modal-behavior.mjs'],{'DSHA_TEST_RUNTIME':str(locked_runtime)})
         run('mobile-auth',[args.node,'tools/test-mobile-auth.mjs'])
         run('mobile-update',[args.node,'tools/test-mobile-update.mjs'])

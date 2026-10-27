@@ -19,7 +19,7 @@ import com.deepseekharness.app.core.HarnessController;
 import com.deepseekharness.app.backup.OneClickBackup;
 
 /**
- * 数据与备份子页：备份（按范围 + 验证）/ 恢复（合并 + 验证）。
+ * 备份与恢复页：立即备份、从备份恢复、自动备份三件事，其余收在“更多”里。
  */
 public class WorkspaceFragment extends Fragment implements OwnTopBar {
 
@@ -45,14 +45,7 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
     controller = HarnessController.get(requireContext());
     task = com.deepseekharness.app.core.BackupTask.get(requireContext());
     oneClick = new androidx.lifecycle.ViewModelProvider(this).get(OneClickBackup.class);
-    ui.setBackupHint(
-        android.os.Build.VERSION.SDK_INT < 29
-            ? com.deepseekharness.app.util.UiText.choose(
-                "首次选择保存目录，之后复用，无需密码；备份时会安全停止 DSH 和运行任务。包含对话、配置、插件和当前应用内工作区；外置工作区请另备。",
-                "Choose a folder once, then reuse it. No password; backup safely stops DSH and running tasks. Includes conversations, settings, plugins and the current app workspace. Back up external workspaces separately.")
-            : com.deepseekharness.app.util.UiText.choose(
-                "直接保存到 下载/DSHA，无需密码；备份时会安全停止 DSH 和运行任务。包含对话、配置、插件和当前应用内工作区；外置工作区请另备。",
-                "Saves directly to Download/DSHA without a password; backup safely stops DSH and running tasks. Includes conversations, settings, plugins and the current app workspace. Back up external workspaces separately."));
+    ui.setIncludeKey(OneClickBackup.includesApiKey(requireContext()));
     refreshBackupStatus();
     return WorkspaceScreenKt.workspacePage(
         requireContext(),
@@ -70,24 +63,28 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
             oneClick.cancel();
           }
 
-          public void files() {
-            open(WorkspaceFilesActivity.class);
+          public void restore() {
+            // 直接打开文件选择；选好后在数据页里验证、确认并恢复。
+            startActivity(
+                new android.content.Intent(requireContext(), NativeDataActivity.class)
+                    .putExtra("data_mode", "restore")
+                    .putExtra("pick", true));
+          }
+
+          public void automatic() {
+            open(AutomaticBackupActivity.class);
+          }
+
+          public void includeKey(boolean on) {
+            OneClickBackup.setIncludesApiKey(requireContext(), on);
+          }
+
+          public void advanced() {
+            open(NativeDataActivity.class);
           }
 
           public void guide() {
             open(StorageHelpActivity.class);
-          }
-
-          public void skills() {
-            open(SkillsActivity.class);
-          }
-
-          public void storage() {
-            open(StorageActivity.class);
-          }
-
-          public void more() {
-            open(NativeDataActivity.class);
           }
 
           public void history() {
@@ -96,27 +93,6 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
                 com.deepseekharness.app.util.UiText.choose(
                     "备份与维护记录", "Backup and maintenance history"),
                 ui.getStatus());
-          }
-
-          public void reset() {
-            if (task.busy() || task.pendingMaintenance()) {
-              taskRejected();
-              return;
-            }
-            new com.deepseekharness.app.ui.DshaDialogBuilder(requireContext(), true)
-                .setTitle(com.deepseekharness.app.util.UiText.text("重置配置？"))
-                .setMessage(
-                    com.deepseekharness.app.util.UiText.choose(
-                        "先停止 Web、终端和写任务，在隔离服务中重置当前 web profile 的普通设置并读回，再事务提交与工作目录 .env。插件构成、对话和凭据保留；原配置可恢复。无法确认时保留原件并显示原因。",
-                        "Stop Web, terminals and writers. Reset ordinary settings of the web profile in an isolated service, read them back, then commit together with the workspace .env. Plugin composition, conversations and credentials are retained. Failures preserve originals and report the reason."))
-                .setPositiveButton(
-                    com.deepseekharness.app.util.UiText.choose(
-                        "保留原件并重置", "Retain originals and reset"),
-                    (d, w) -> {
-                      if (!task.resetConfig()) taskRejected();
-                    })
-                .setNegativeButton(com.deepseekharness.app.util.UiText.text("取消"), null)
-                .show();
           }
         });
   }
@@ -161,22 +137,24 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
 
   private void refreshBackupStatus() {
     long time = controller.config().getLastBackupSuccess();
-    String success =
-        time == 0
+    String where =
+        android.os.Build.VERSION.SDK_INT < 29
             ? com.deepseekharness.app.util.UiText.choose(
-                "还没有手动导出备份", "No manually exported backup yet")
+                "首次选择保存目录，之后复用", "Choose a folder once, then reuse it")
+            : com.deepseekharness.app.util.UiText.choose("保存到 下载/DSHA", "Saved to Download/DSHA");
+    ui.setLastBackup(
+        time == 0
+            ? com.deepseekharness.app.util.UiText.choose("还没有备份", "No backup yet") + " · " + where
             : com.deepseekharness.app.util.UiText.format(
-                "最近手动备份：%s\n%s",
-                java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(time)),
-                controller.config().getLastBackupName());
-    long automatic =
-        com.deepseekharness.app.backup.AutomaticBackups.prefs(requireContext()).getLong("last", 0);
-    StringBuilder summary = new StringBuilder(success);
-    if (automatic > 0)
-      summary.append(
-          com.deepseekharness.app.util.UiText.format(
-              "\n最近自动副本：%s",
-              java.text.DateFormat.getDateTimeInstance().format(new java.util.Date(automatic))));
+                    "上次：%s",
+                    java.text.DateFormat.getDateTimeInstance(
+                            java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+                        .format(new java.util.Date(time)))
+                + " · "
+                + where);
+    ui.setAutomatic(automaticSummary());
+    // 上次备份时间已写在“立即备份”下面，这里只放进度、错误和待处理的任务。
+    StringBuilder summary = new StringBuilder();
     String failure = controller.config().getLastBackupError();
     com.deepseekharness.app.util.BackupTaskState.Snapshot s = task.snapshot();
     EnvironmentUiStatus.Snapshot environment = EnvironmentUiStatus.get(requireContext());
@@ -196,7 +174,7 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
     if (nativeStatus != null && !nativeStatus.isEmpty())
       summary.append("\n\n").append(nativeStatus);
     ui.setCancelVisible(nativeBusy);
-    ui.setStatus(summary.toString());
+    ui.setStatus(summary.toString().trim());
     ui.setEnabled(!busy && !pending);
     if (s.status == com.deepseekharness.app.util.BackupTaskState.Status.PREVIEW
         && previewDialog == null
@@ -216,6 +194,23 @@ public class WorkspaceFragment extends Fragment implements OwnTopBar {
       previewDialog.setOnDismissListener(d -> previewDialog = null);
       previewDialog.show();
     }
+  }
+
+  /** 自动备份当前计划的一句话说明。 */
+  private String automaticSummary() {
+    var context = requireContext();
+    if (!com.deepseekharness.app.backup.AutomaticBackups.enabled(context))
+      return com.deepseekharness.app.util.UiText.choose("已关闭", "Off");
+    var prefs = com.deepseekharness.app.backup.AutomaticBackups.prefs(context);
+    String mode = prefs.getString("mode", "daily");
+    if ("interval".equals(mode))
+      return com.deepseekharness.app.util.UiText.format("每 %s 小时", prefs.getInt("hours", 24));
+    if ("stop".equals(mode))
+      return com.deepseekharness.app.util.UiText.choose("每次停止 DSH 后", "After DSH stops");
+    int minute = prefs.getInt("minute", 180);
+    return com.deepseekharness.app.util.UiText.format(
+        "每天 %s",
+        String.format(java.util.Locale.ROOT, "%02d:%02d", minute / 60, minute % 60));
   }
 
   @Override

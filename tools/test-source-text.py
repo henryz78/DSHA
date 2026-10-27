@@ -64,7 +64,7 @@ class SourceTextTest(unittest.TestCase):
             descriptor.main(['--write']);descriptor.main(['--check'])
             self.assertEqual(expected,target.read_bytes())
     def test_all_requested_generators_use_explicit_writer_and_py39_helper(self):
-        names=['build-dsh-runtime.py','prepare-backup-assets.py','prepare-runtime-descriptor.py','prepare-standard-assets.py','prepare-recovery-assets.py','prepare-ui-languages.py','prepare-dsh-runtime.py','generate-builtin-plugins.py','prepare-runtime-tools.py','prepare-test-runtime.py']
+        names=['build-dsh-runtime.py','prepare-backup-assets.py','prepare-runtime-descriptor.py','prepare-standard-assets.py','prepare-ui-languages.py','prepare-dsh-runtime.py','generate-builtin-plugins.py','prepare-runtime-tools.py','prepare-test-runtime.py']
         for name in names:
             tree=ast.parse((ROOT/'tools'/name).read_text(encoding='utf-8'))
             self.assertFalse(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='write_text' for n in ast.walk(tree)),name)

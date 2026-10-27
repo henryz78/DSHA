@@ -886,71 +886,6 @@
       "cli": "no positional arguments; see explicit environment/requirements"
     },
     {
-      "path": "tools/test-recovery-agent.mjs",
-      "stage": "runtime",
-      "reason": "Current source/verified runtime host fixture; explicit dependencies and sandbox HOME; no Android device operations",
-      "args": [],
-      "timeoutSeconds": 900,
-      "requires": [
-        "node24",
-        "raw"
-      ],
-      "environment": {},
-      "cli": "no positional arguments; see explicit environment/requirements"
-    },
-    {
-      "path": "tools/test-recovery-apk-assets.py",
-      "stage": "runtime",
-      "reason": "Current source/verified runtime host fixture; explicit dependencies and sandbox HOME; no Android device operations",
-      "args": [],
-      "timeoutSeconds": 900,
-      "requires": [
-        "python39"
-      ],
-      "environment": {},
-      "cli": "no positional arguments; see explicit environment/requirements"
-    },
-    {
-      "path": "tools/test-recovery-assets.py",
-      "stage": "runtime",
-      "reason": "Current source/verified runtime host fixture; explicit dependencies and sandbox HOME; no Android device operations",
-      "args": [],
-      "timeoutSeconds": 900,
-      "requires": [
-        "python39"
-      ],
-      "environment": {},
-      "cli": "no positional arguments; see explicit environment/requirements"
-    },
-    {
-      "path": "tools/test-recovery-browser-overlay.mjs",
-      "stage": "runtime",
-      "reason": "Current source/verified runtime host fixture; explicit dependencies and sandbox HOME; no Android device operations",
-      "args": [
-        "{recoveryAssets}"
-      ],
-      "timeoutSeconds": 900,
-      "requires": [
-        "node24",
-        "generated_recovery"
-      ],
-      "environment": {}
-    },
-    {
-      "path": "tools/test-recovery-profile-boot.mjs",
-      "stage": "runtime",
-      "reason": "Current source/verified runtime host fixture; explicit dependencies and sandbox HOME; no Android device operations",
-      "args": [],
-      "timeoutSeconds": 900,
-      "requires": [
-        "node24",
-        "raw",
-        "browser"
-      ],
-      "environment": {},
-      "cli": "no positional arguments; see explicit environment/requirements"
-    },
-    {
       "path": "tools/test-release-acceptance.py",
       "stage": "fast",
       "reason": "隔离宿主或纯源码/协议回归，无发布密钥、设备和真实用户数据",
@@ -2088,21 +2023,6 @@
       ],
       "environment": {},
       "cli": "python tools/test-physical-screen-flow.py --dependency-reference <cached Gradle-deps JSON> --production-classes <current standardDebug classes> --out <owned output>"
-    },
-    {
-      "path": "tools/test-recovery-native-consent.mjs",
-      "stage": "runtime",
-      "reason": "Independent recovery consent: actual signed transport against a local controlled broker plus the real current managed ToolRuntime five-tool profile and guard composition; no Android phone",
-      "args": [],
-      "timeoutSeconds": 900,
-      "requires": [
-        "node24",
-        "managed"
-      ],
-      "environment": {
-        "DSHA_TEST_RUNTIME": "{managed}"
-      },
-      "cli": "No arguments; DSHA_TEST_RUNTIME points to the verified current managed host tree for the full five-tool/guard branch"
     },
     {
       "path": "tools/test-bundled-dsh-version.py",

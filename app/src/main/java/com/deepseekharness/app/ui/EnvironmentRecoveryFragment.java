@@ -26,11 +26,6 @@ public final class EnvironmentRecoveryFragment extends Fragment implements OwnTo
             startActivity(
                 new Intent(requireContext(), ExtractActivity.class).putExtra("review_only", true)));
     actions.arrow(
-        UiText.choose("启动应急 DSH", "Start emergency DSH"),
-        "",
-        R.drawable.ic_ui_shield,
-        () -> startActivity(new Intent(requireContext(), RecoveryActivity.class)));
-    actions.arrow(
         UiText.text("查看并下载诊断日志"),
         "",
         R.drawable.ic_recovery_document,

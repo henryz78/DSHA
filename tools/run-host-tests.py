@@ -15,8 +15,8 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "tools/host-tests.manifest.json"
 STAGES = ("fast", "runtime", "package", "windows", "linux")
-REQUIRES = {"node24", "python39", "powershell", "raw", "managed", "browser", "browser_react", "jdk17", "pnpm", "current_archive", "tar", "guide_fixture", "native_host", "generated_recovery", "mobile_upstream", "git_bash", "toolchains", "debug_classes", "linux_node", "linux_publish_packages", "semver_reference"}
-TOKENS = {"apks", "fixture", "posixFixture", "modules", "managedModules", "managedStorageModule", "raw", "managed", "rawSemver", "rawConversationModule", "reactReference", "pnpmCli", "runtimeArchive", "recoveryAssets", "mobileUpstream", "guideFixture", "toolchainRoot", "sdk", "gradleCache", "gradleHome", "jdk", "flavor", "linuxPublisher", "linuxHost", "linuxNativeInputs", "wslDistro", "linuxTempdir"}
+REQUIRES = {"node24", "python39", "powershell", "raw", "managed", "browser", "browser_react", "jdk17", "pnpm", "current_archive", "tar", "guide_fixture", "native_host", "mobile_upstream", "git_bash", "toolchains", "debug_classes", "linux_node", "linux_publish_packages", "semver_reference"}
+TOKENS = {"apks", "fixture", "posixFixture", "modules", "managedModules", "managedStorageModule", "raw", "managed", "rawSemver", "rawConversationModule", "reactReference", "pnpmCli", "runtimeArchive", "mobileUpstream", "guideFixture", "toolchainRoot", "sdk", "gradleCache", "gradleHome", "jdk", "flavor", "linuxPublisher", "linuxHost", "linuxNativeInputs", "wslDistro", "linuxTempdir"}
 
 
 def load_manifest():
@@ -124,7 +124,7 @@ class Inputs:
             if not (row.get("executor")=="linux" and os.name=="nt" and self.args.linux_host):
                 raise ValueError("HOST_LINUX_PLATFORM_REQUIRED")
         values = {"fixture": str(fixture), "posixFixture": "/" + fixture.as_posix().split(":", 1)[1].lstrip("/") if os.name == "nt" else str(fixture), "flavor": self.args.flavor,
-                  "runtimeArchive": str(ROOT / "app/src/main/assets/dsh-runtime.bin"), "recoveryAssets": str(ROOT / "app/build/generated/recoveryAssets"),
+                  "runtimeArchive": str(ROOT / "app/src/main/assets/dsh-runtime.bin"),
                   "mobileUpstream": str(Path(self.args.mobile_upstream).resolve())}
         if "node24" in req:
             self.node=executable(self.node)
@@ -195,8 +195,6 @@ class Inputs:
         if "debug_classes" in req:
             cap = self.args.flavor[0].upper() + self.args.flavor[1:]
             required_directory(ROOT / f"app/build/intermediates/javac/{self.args.flavor}Debug/compile{cap}DebugJavaWithJavac/classes", "HOST_CURRENT_DEBUG_CLASSES_REQUIRED")
-        if "generated_recovery" in req:
-            required_file(Path(values["recoveryAssets"]) / "recovery-runtime.json", "HOST_GENERATED_RECOVERY_MISSING")
         if "mobile_upstream" in req:
             required_directory(values["mobileUpstream"], "HOST_FIXED_MOBILE_UPSTREAM_REQUIRED")
         if "git_bash" in req:

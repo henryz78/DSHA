@@ -78,12 +78,6 @@
         <activity android:name=".ui.UpdateActivity" android:exported="false" />
         <activity android:name=".ui.DiagnosticActivity" android:exported="false" />
         <activity android:name=".ui.StartupRecoveryActivity" android:exported="false" />
-        <activity android:name=".ui.RecoveryActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <activity android:name=".ui.RecoveryWebActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
-        <service android:name=".recovery.RecoveryService" android:exported="false" android:foregroundServiceType="specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="User-started emergency AI recovery workspace with an isolated runtime, foreground progress, and explicit stop action." />
-        </service>
         <activity android:name=".ui.BackgroundTasksActivity" android:exported="false" />
         <activity android:name=".ui.AgentTasksActivity" android:exported="false" />
         <receiver android:name=".AgentTaskStopReceiver" android:exported="false" />

@@ -38,10 +38,7 @@ def digest(path):
 
 
 def allowed():
-    names = {"app/src/main/assets/" + name for name in NAMES}
-    lock = json.loads((ROOT / "tools/recovery-runtime/lock.json").read_text(encoding="utf-8"))
-    names.update("tools/recovery-runtime/archives/" + row["asset"] for row in lock["archives"])
-    return names
+    return {"app/src/main/assets/" + name for name in NAMES}
 
 
 def required_lock(name, error):
@@ -93,10 +90,6 @@ def verify_sources():
         if not isinstance(expected, str) or not re.fullmatch(r"[a-f0-9]{64}", expected) \
                 or size is not None and path.stat().st_size != size or digest(path) != expected:
             raise ValueError("CI_ASSET_SOURCE_MISMATCH: " + name)
-    lock = json.loads((ROOT / "tools/recovery-runtime/lock.json").read_text(encoding="utf-8"))
-    for row in lock["archives"]:
-        if digest(bounded("tools/recovery-runtime/archives/" + row["asset"])) != row["sha256"]:
-            raise ValueError("CI_RECOVERY_ARCHIVE_MISMATCH")
 
 
 def main(argv=None):

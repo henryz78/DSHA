@@ -501,7 +501,10 @@ public final class PluginRepository extends AndroidViewModel {
                       proot,
                       "review-restored " + ShellQuote.arg(group) + " " + ShellQuote.arg(node))));
         },
-        this::confirmPreview);
+        this::confirmPreview,
+        true,
+        // 和其它安装入口一样先清掉上一次的成功标记，恢复后的自动启用靠它判断结果。
+        () -> installationSucceeded = false);
   }
 
   public void reviewLegacyPreset(String retainedKey) {

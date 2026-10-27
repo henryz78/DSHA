@@ -49,12 +49,6 @@ public final class StartupRecoveryActivity extends AppCompatActivity {
     plugins = layout.plugins;
     progress = layout.progress;
     action(
-        layout.recovery,
-        t("启动独立应急 DSH", "Start independent emergency DSH"),
-        R.drawable.ic_recovery_shield,
-        () -> startActivity(new Intent(this, RecoveryActivity.class)),
-        false);
-    action(
         layout.tools,
         t("宿主备份与只读救援", "Host backup and read-only rescue"),
         R.drawable.ic_recovery_document,

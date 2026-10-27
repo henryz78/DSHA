@@ -250,7 +250,6 @@ public final class ErrorLogRepository extends AndroidViewModel {
   private static java.util.Map<String, Object> status(android.content.Context context) {
     var config = new ConfigStore(context);
     var startup = HarnessController.get(context).startupDiagnostics().snapshot();
-    var emergency = com.deepseekharness.app.recovery.RecoveryController.get(context).snapshot();
     java.util.Map<String, Object> value = new java.util.LinkedHashMap<>();
     value.put("schema", 1L);
     value.put("capturedAtMillis", System.currentTimeMillis());
@@ -271,15 +270,6 @@ public final class ErrorLogRepository extends AndroidViewModel {
             startup.safe,
             "issueCount",
             (long) startup.issues.size()));
-    value.put(
-        "emergency",
-        java.util.Map.of(
-            "state",
-            emergency.state.toString(),
-            "generation",
-            emergency.generation,
-            "errorCode",
-            category(emergency.errorCode)));
     return value;
   }
 
@@ -316,17 +306,6 @@ public final class ErrorLogRepository extends AndroidViewModel {
     text.append("runtimeTrialFailureRecorded=")
         .append(!com.deepseekharness.app.runtime.RuntimeTrial.latestFailure(context).isEmpty())
         .append('\n');
-    var emergency = com.deepseekharness.app.recovery.RecoveryController.get(context).snapshot();
-    text.append(
-            com.deepseekharness.app.util.UiText.choose(
-                "\n=== 独立应急 DSH ===\n", "\n=== Independent emergency DSH ===\n"))
-        .append("state=")
-        .append(emergency.state)
-        .append(" generation=")
-        .append(emergency.generation)
-        .append(" errorCode=")
-        .append(category(emergency.errorCode))
-        .append("\n");
     var current = HarnessController.get(context).startupDiagnostics().snapshot();
     text.append("currentStartup: stage=")
         .append(category(current.stage))

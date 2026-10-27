@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -120,14 +121,20 @@ private fun CommonSection(context: Context, config: ConfigStore, nav: SettingsNa
         HarnessService.refreshPowerMode(context)
       },
     )
+    val pipSupported = remember { PictureInPictureActivity.supported(context) }
     SwitchPreference(
       startAction = { HyIcon(MiuixIcons.ScreenMirroring) },
       title = t("画中画", "Picture-in-picture"),
-      summary = t("切到后台时以小窗显示对话", "Show the conversation in a small window in background"),
-      checked = pip,
+      summary =
+        if (pipSupported) t("切到后台时以小窗显示对话", "Show the conversation in a small window in background")
+        else stringResource(R.string.picture_in_picture_unsupported),
+      checked = pip && pipSupported,
+      enabled = pipSupported,
       onCheckedChange = {
         pip = it
         config.setPictureInPictureEnabled(it)
+        // 系统还没给本应用开“画中画”权限时，打开开关就直接带去系统设置。
+        if (it && !PictureInPictureActivity.allowed(context)) ConfigFragment.openPictureSettings(context)
       },
     )
     if (GlassBar.supported)
@@ -188,7 +195,7 @@ private fun DataSection(nav: SettingsNavigation) {
     ArrowPreference(
       startAction = { HyIcon(MiuixIcons.Folder) },
       title = t("存储空间", "Storage"),
-      summary = t("空间占用与缓存清理", "Usage and cache cleanup"),
+      summary = t("空间占用、文件导出与缓存清理", "Usage, file export and cache cleanup"),
       onClick = { nav.openActivity(StorageActivity::class.java) },
     )
     ArrowPreference(

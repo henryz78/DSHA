@@ -8,6 +8,48 @@ import java.util.*;
 public final class QuarantinedPluginReview {
   private QuarantinedPluginReview() {}
 
+  /**
+   * 原来装在 profile 里时，npm 会把依赖提升到 profiles/&lt;名&gt;/node_modules（如 dsh-turn-rewind 的 ignore），
+   * 备份图里只记在 profile 层，插件自己没有这条边；单独审查插件时就找不到，报“缺少运行依赖”。
+   * 这里给每个非受管包补上：package.json 的 dependencies 里有、自己没边、但 profile 层绑定了的那些。
+   */
+  @SuppressWarnings("unchecked")
+  static Map<String, Object> withHoisted(BackupFileSystem fs, File store, Map<String, Object> graph)
+      throws IOException {
+    if (!(graph.get("nodes") instanceof Map<?, ?> nodes)
+        || !(graph.get("profiles") instanceof Map<?, ?> profiles)) return graph;
+    Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) nodes);
+    for (var row : copy.entrySet()) {
+      if (!(row.getValue() instanceof Map<?, ?> raw)
+          || Boolean.TRUE.equals(raw.get("managed"))
+          || !(raw.get("edges") instanceof Map<?, ?> existing)) continue;
+      if (!fs.stat(new File(store, "packages/" + row.getKey())).type.equals("DIRECTORY")) continue;
+      File manifest = fs.child(store, "packages/" + row.getKey() + "/package.json");
+      if (!fs.stat(manifest).type.equals("FILE")) continue;
+      Map<String, Object> pkg =
+          BackupJson.read(fs.small(manifest, BackupLimits.MANIFEST), BackupLimits.MANIFEST);
+      if (!(pkg.get("dependencies") instanceof Map<?, ?> deps)) continue;
+      Map<String, Object> edges = new LinkedHashMap<>((Map<String, Object>) existing);
+      for (Object name : deps.keySet()) {
+        if (edges.containsKey(name)) continue;
+        for (Object bindings : profiles.values())
+          if (bindings instanceof Map<?, ?> bound
+              && bound.get(name) instanceof String to
+              && nodes.containsKey(to)) {
+            edges.put((String) name, to);
+            break;
+          }
+      }
+      if (edges.size() == ((Map<?, ?>) existing).size()) continue;
+      Map<String, Object> node = new LinkedHashMap<>((Map<String, Object>) raw);
+      node.put("edges", edges);
+      row.setValue(node);
+    }
+    Map<String, Object> result = new LinkedHashMap<>(graph);
+    result.put("nodes", copy);
+    return result;
+  }
+
   static File createReviewSlot(BackupFileSystem fs, File parent) throws IOException {
     String type = fs.stat(parent).type;
     if (type.equals("MISSING")) fs.directory(parent);
@@ -177,7 +219,11 @@ public final class QuarantinedPluginReview {
         fs.child(
             com.deepseekharness.app.util.GuestPaths.rootfs(files),
             "root/dsha-native-plugin-reviews");
-    File target = createReviewSlot(fs, parent);
+    // 复制要求目标不存在，所以这里只取新名字、不预先建目录（原来用 createReviewSlot 预建，必然 COPY_TARGET_EXISTS）。
+    String type = fs.stat(parent).type;
+    if (type.equals("MISSING")) fs.directory(parent);
+    else if (!type.equals("DIRECTORY")) throw new IOException("PLUGIN_QUARANTINE_DIRECTORY");
+    File target = fs.child(parent, UUID.randomUUID().toString());
     String id = target.getName();
     String before = BackupTree.digest(fs, source, control);
     BackupTree.copy(fs, source, target, control);
@@ -197,7 +243,7 @@ public final class QuarantinedPluginReview {
               target,
               new CurrentManagedPackages(context)::verified,
               com.deepseekharness.app.util.GuestPaths.rootfs(files))
-          .rebuild(graph, control);
+          .rebuild(withHoisted(fs, target, graph), control);
     }
     fs.atomic(
         target,

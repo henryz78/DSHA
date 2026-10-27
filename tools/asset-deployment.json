@@ -85,10 +85,6 @@
     "rc1-migration.py",
     "rc1-settings-migration-patch.json",
     "rc1-settings-migration.cjs",
-    "recovery-agent.js",
-    "recovery-native-consent.cjs",
-    "recovery-profile-package.json",
-    "recovery-profile.patch.yml",
     "register-builtin-plugins.py",
     "retire-guarded-preset-patch.json",
     "retired-market-catalog-patch.json",
@@ -125,7 +121,6 @@
     "builtin-plugins",
     "client-combo-cache",
     "licenses",
-    "recovery-web-integration",
     "runtime-fs",
     "session-compat",
     "web-integration",
@@ -153,17 +148,9 @@
     "dsh-runtime.sha256",
     "web-integration/gecko-compat.js"
   ],
-  "externalGeneratedFiles": [
-    "recovery-runtime.json",
-    "recovery-asset-locations.json",
-    "recovery-overlay/index.html",
-    "recovery-overlay/client.pdf.js",
-    "recovery-overlay/client-resources.js",
-    "recovery-overlay/client-locale.js"
-  ],
+  "externalGeneratedFiles": [],
   "extensionTrees": [
-    "web-integration",
-    "recovery-web-integration"
+    "web-integration"
   ],
   "optionalHistoricalReads": [
     "adb-wheels.tar.gz",
@@ -211,18 +198,6 @@
         "offline-rootfs.bin",
         "dsh-runtime.bin",
         "ubuntu-tools.bin"
-      ]
-    },
-    {
-      "source": "app/src/main/java/com/deepseekharness/app/recovery/RecoveryRuntime.java",
-      "method": "readAsset(name)/locations",
-      "contract": "prepareRecoveryAssets writes exact pinned runtime map and archives outside standard assets; recovery APK gate validates mapped physical bytes.",
-      "assets": [
-        "recovery-agent.js",
-        "recovery-profile.patch.yml",
-        "recovery-profile-package.json",
-        "recovery-runtime.json",
-        "recovery-asset-locations.json"
       ]
     },
     {

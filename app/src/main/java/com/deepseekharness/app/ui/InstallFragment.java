@@ -106,12 +106,45 @@ public class InstallFragment extends Fragment implements OwnTopBar {
                 startActivity(new Intent(requireContext(), StartupRecoveryActivity.class));
               }
 
+              public void resetConfig() {
+                // 从备份页挪过来：这是维护操作，不属于备份。
+                var task = com.deepseekharness.app.core.BackupTask.get(requireContext());
+                if (task.busy() || task.pendingMaintenance()) {
+                  resetRejected(task);
+                  return;
+                }
+                new DshaDialogBuilder(requireContext(), true)
+                    .setTitle(com.deepseekharness.app.util.UiText.text("重置配置？"))
+                    .setMessage(
+                        com.deepseekharness.app.util.UiText.choose(
+                            "先停止 Web、终端和写任务，在隔离服务中重置当前 web profile 的普通设置并读回，再事务提交与工作目录 .env。插件构成、对话和凭据保留；原配置可恢复。无法确认时保留原件并显示原因。",
+                            "Stop Web, terminals and writers. Reset ordinary settings of the web profile in an isolated service, read them back, then commit together with the workspace .env. Plugin composition, conversations and credentials are retained. Failures preserve originals and report the reason."))
+                    .setPositiveButton(
+                        com.deepseekharness.app.util.UiText.choose(
+                            "保留原件并重置", "Retain originals and reset"),
+                        (d, w) -> {
+                          if (!task.resetConfig()) resetRejected(task);
+                        })
+                    .setNegativeButton(com.deepseekharness.app.util.UiText.text("取消"), null)
+                    .show();
+              }
+
               public void tasks() {
                 BackgroundTasksActivity.open(requireContext());
               }
             });
     render();
     return page;
+  }
+
+  private void resetRejected(com.deepseekharness.app.core.BackupTask task) {
+    android.widget.Toast.makeText(
+            requireContext(),
+            task.pendingMaintenance()
+                ? com.deepseekharness.app.util.UiText.text("请先点「恢复中断维护」，原环境尚未确认。")
+                : com.deepseekharness.app.util.UiText.text("已有数据任务进行中，请等待或处理恢复预览。"),
+            android.widget.Toast.LENGTH_SHORT)
+        .show();
   }
 
   @Override

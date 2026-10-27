@@ -144,8 +144,7 @@ android {
     }
 
     sourceSets {
-        main.assets.setSrcDirs([layout.buildDirectory.dir("generated/standardAssets").get().asFile,
-                layout.buildDirectory.dir("generated/recoveryAssets").get().asFile])
+        main.assets.setSrcDirs([layout.buildDirectory.dir("generated/standardAssets").get().asFile])
         main.java.srcDir(layout.buildDirectory.dir("generated/uiLanguage").get().asFile)
         // Both browser test entry points load one test-only HTML fixture.
         debug.assets.srcDir(rootProject.file("tools/fixtures/web-state"))
@@ -209,7 +208,7 @@ tasks.withType(Test).configureEach {
 }
 tasks.configureEach {
     if (name in ['verifyBundledIdentities', 'verifyBuiltinRegistry', 'prepareStandardAssets',
-                 'prepareBackupAssets', 'prepareRuntimeDescriptor', 'prepareRecoveryAssets', 'prepareUiLanguages'])
+                 'prepareBackupAssets', 'prepareRuntimeDescriptor', 'prepareUiLanguages'])
         inputs.file(rootProject.file('tools/source_text.py'))
 }
 
@@ -271,35 +270,6 @@ prepareStandardAssets.configure { dependsOn(prepareRuntimeDescriptor) }
 // 包来源证明也是运行时身份输入，显式保证检查顺序，避免并行任务读取未检查的证明。
 prepareRuntimeDescriptor.configure { dependsOn(prepareBackupAssets) }
 
-// 应急运行时拥有独立锁；正式 DSH 更新不会把它隐式替换。
-def prepareRecoveryAssets = tasks.register("prepareRecoveryAssets", Exec) {
-    dependsOn(prepareStandardAssets)
-    inputs.file(rootProject.file("tools/prepare-recovery-assets.py"))
-    inputs.file(rootProject.file("tools/recovery_runtime_overlay.py"))
-    inputs.file(rootProject.file("tools/generated_asset_directory.py"))
-    inputs.files(rootProject.files("tools/asset-deployment.json", "tools/asset_deployment.py"))
-    inputs.file(rootProject.file("tools/recovery-runtime/lock.json"))
-    // 正式归档变化必须重算物理位置；固定副本可以首次缺失后由同摘要种子建立。
-    inputs.files(layout.buildDirectory.file("generated/standardAssets/offline-rootfs.bin"),
-            layout.buildDirectory.file("generated/standardAssets/dsh-runtime.bin"))
-            .withPropertyName("recoverySharedArchives").optional()
-    inputs.files(fileTree(rootProject.file("tools/recovery-runtime/archives")))
-            .withPropertyName("recoveryPinnedArchives")
-    inputs.files(file("src/main/assets/recovery-agent.js"), file("src/main/assets/recovery-profile-package.json"), file("src/main/assets/recovery-profile.patch.yml"))
-    inputs.files(fileTree("src/main/assets/destructive-policy"), file("src/main/assets/recovery-native-consent.cjs"))
-    inputs.files(file("src/main/assets/web-integration/es-compat.js"), file("src/main/assets/web-integration/startup.js"), file("src/main/assets/pdf-compat-patch.json"),
-            file("src/main/assets/language-patch.json"), file("src/main/assets/web-integration/language.js"))
-    inputs.files(fileTree("src/main/jniLibs"))
-    outputs.dir(layout.buildDirectory.dir("generated/recoveryAssets"))
-    commandLine(System.getenv("DSHA_PYTHON") ?: "python3", "-B",
-            rootProject.file("tools/prepare-recovery-assets.py").absolutePath,
-            "--output", layout.buildDirectory.dir("generated/recoveryAssets").get().asFile.absolutePath,
-            "--shared-assets", layout.buildDirectory.dir("generated/standardAssets").get().asFile.absolutePath)
-}
-tasks.configureEach {
-    if (name.matches("merge(Standard|Low).*Assets")) dependsOn(prepareRecoveryAssets)
-}
-
 def verifyBackupDependencies = tasks.register("verifyBackupDependencies") {
     inputs.file(rootProject.file("tools/backup-dependencies.lock.json"))
     doLast {
@@ -351,7 +321,7 @@ def verifyBackupDependencies = tasks.register("verifyBackupDependencies") {
     }
 }
 tasks.withType(JavaCompile).configureEach { dependsOn(verifyBackupDependencies) }
-tasks.named("preBuild").configure { dependsOn(prepareStandardAssets, prepareRecoveryAssets) }
+tasks.named("preBuild").configure { dependsOn(prepareStandardAssets) }
 def prepareUiLanguages = tasks.register("prepareUiLanguages", Exec) {
     inputs.file(rootProject.file("tools/prepare-ui-languages.py"))
     inputs.file(rootProject.file("tools/i18n/messages.json"))

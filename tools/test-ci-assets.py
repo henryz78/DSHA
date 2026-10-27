@@ -27,8 +27,7 @@ class CiAssetsTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         self.assets = self.root / 'app/src/main/assets'
         self.assets.mkdir(parents=True)
-        self.recovery = self.root / 'tools/recovery-runtime'
-        (self.recovery / 'archives').mkdir(parents=True)
+        (self.root / 'tools').mkdir()
         self.root_patch = patch.object(assets, 'ROOT', self.root)
         self.root_patch.start()
         self.addCleanup(self.root_patch.stop)
@@ -42,19 +41,12 @@ class CiAssetsTests(unittest.TestCase):
             {'asset': 'python-support.bin', 'sha256': sha(self.blobs['python-support.bin']),
              'bytes': len(self.blobs['python-support.bin'])}]}
         self.adb_lock = {'schema': 1, 'archiveSha256': sha(self.blobs['adb-wheels.tar.gz'])}
-        self.recovery_blobs = {'recovery-rootfs.bin': b'pinned recovery rootfs',
-                               'recovery-dsh-runtime.bin': b'pinned recovery dsh'}
-        self.recovery_lock = {'schema': 1, 'archives': [
-            {'asset': name, 'sha256': sha(data)} for name, data in self.recovery_blobs.items()]}
-        for name, data in self.recovery_blobs.items():
-            (self.recovery / 'archives' / name).write_bytes(data)
         self.save_locks()
 
     def save_locks(self):
         (self.assets / 'runtime-descriptor.json').write_text(json.dumps(self.descriptor), encoding='utf-8')
         (self.root / 'tools/ci-build-inputs.lock.json').write_text(json.dumps(self.input_lock), encoding='utf-8')
         (self.assets / 'adb-wheels.lock.json').write_text(json.dumps(self.adb_lock), encoding='utf-8')
-        (self.recovery / 'lock.json').write_text(json.dumps(self.recovery_lock), encoding='utf-8')
 
     def pack(self, target=None):
         target = target or self.root / 'verified-inputs.zip'
@@ -73,8 +65,6 @@ class CiAssetsTests(unittest.TestCase):
             self.assertEqual(len(archive.namelist()), len(assets.allowed()))
             for name, data in self.blobs.items():
                 self.assertEqual(archive.read('app/src/main/assets/' + name), data)
-            for name, data in self.recovery_blobs.items():
-                self.assertEqual(archive.read('tools/recovery-runtime/archives/' + name), data)
         self.assertNotIn('tools/ci-build-inputs.lock.json', assets.allowed(), 'source lock is already in the source checkout')
 
     def test_bad_python_digest_and_size_are_rejected(self):
@@ -144,11 +134,6 @@ class CiAssetsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'CI_ASSET_SOURCE_MISMATCH: pnpm-runtime.bin'):
             assets.verify_sources()
 
-    def test_recovery_still_requires_its_original_lock(self):
-        (self.recovery / 'archives/recovery-rootfs.bin').write_bytes(b'other recovery')
-        with self.assertRaisesRegex(ValueError, 'CI_RECOVERY_ARCHIVE_MISMATCH'):
-            assets.verify_sources()
-
     def test_existing_pack_output_is_preserved(self):
         target = self.root / 'already-present.zip'
         target.write_bytes(b'original output remains')
@@ -161,7 +146,6 @@ class CiAssetsTests(unittest.TestCase):
     def test_pack_then_restore_fixture_verifies_the_same_fixed_inputs(self):
         package, receipt = self.pack()
         binary_paths = [self.assets / name for name in self.blobs]
-        binary_paths += [self.recovery / 'archives' / name for name in self.recovery_blobs]
         for path in binary_paths:
             path.unlink()
         output = io.StringIO()

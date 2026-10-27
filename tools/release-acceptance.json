@@ -74,9 +74,7 @@
         "*/assets/web-integration/startup.js",
         "*/assets/pdf-compat-patch.json",
         "*/assets/language-patch.json",
-        "*/assets/web-integration/language.js",
-        "tools/prepare-recovery-assets.py",
-        "tools/recovery_runtime_overlay.py"
+        "*/assets/web-integration/language.js"
       ],
       "flavors": [
         "standard",

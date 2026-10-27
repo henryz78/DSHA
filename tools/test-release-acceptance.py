@@ -121,7 +121,7 @@ class AcceptanceTest(unittest.TestCase):
 
     def test_compatibility_behavior_inputs_select_recovery_matrix(self):
         for path in ('app/src/main/assets/web-integration/es-compat.js','app/src/main/assets/web-integration/compat.js',
-                     'app/src/main/assets/pdf-compat-patch.json','tools/prepare-recovery-assets.py'):
+                     'app/src/main/assets/pdf-compat-patch.json'):
             with self.subTest(path=path):
                 selected=requirements({path:'a'*64},{path:'b'*64})
                 self.assertIn('recovery-language-rotation',selected['required']['standard'])

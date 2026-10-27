@@ -58,11 +58,6 @@ public class ExtractActivity extends AppCompatActivity {
     enter = model.button(com.deepseekharness.app.util.UiText.text("进入主界面"), false, this::proceed);
     var tools = model.section(com.deepseekharness.app.util.UiText.choose("其他工具", "Other tools"));
     tools.arrow(
-        com.deepseekharness.app.util.UiText.choose("启动应急 DSH", "Start emergency DSH"),
-        "",
-        R.drawable.ic_ui_shield,
-        () -> startActivity(new Intent(this, RecoveryActivity.class)));
-    tools.arrow(
         com.deepseekharness.app.util.UiText.choose("查看本次维护记录", "View maintenance record"),
         "",
         R.drawable.ic_recovery_document,
