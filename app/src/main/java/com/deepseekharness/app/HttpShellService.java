@@ -831,6 +831,11 @@ public final class HttpShellService {
     if ((route == BridgeRoutes.Route.CONFIRM || route == BridgeRoutes.Route.EXEC)
         && request.command.isEmpty()) return "[NO_CMD]";
     if (!bridgeCurrent(request.scope)) return "[STOPPED] BRIDGE_RUN_CHANGED";
+    if (!BridgeRoutes.phoneFree(route) && !com.deepseekharness.app.core.PhoneAccess.allowed(ctx))
+      return "[DISABLED] PHONE_ACCESS_OFF "
+          + com.deepseekharness.app.util.UiText.choose(
+              "用户关闭了「允许 AI 访问手机」，此接口不可用。照原话告诉用户：需要时到 设置 → 允许 AI 访问手机 打开；不要重试。",
+              "The user turned off \"Allow AI to access the phone\", so this endpoint is unavailable. Tell the user they can turn it on in Settings when needed; do not retry.");
     RouteHandler handler = ROUTE_HANDLERS.get(route);
     if (handler == null) throw new IllegalStateException("Missing bridge handler: " + route);
     return handler.handle(this, request);

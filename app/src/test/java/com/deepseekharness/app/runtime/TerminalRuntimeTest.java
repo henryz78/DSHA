@@ -30,8 +30,10 @@ public class TerminalRuntimeTest {
     var spec = LaunchSpec.runtime(RuntimeLauncherTest.fake()).hardlinks(true).build();
     var result = TerminalRuntime.prepare(launcher, root, spec, "/bin/bash", "-l");
     assertEquals("fixture-runtime", result.argv()[0]);
-    assertArrayEquals(
-        new String[] {"fixture-runtime", root.getPath(), "/bin/bash", "-l"}, result.argv());
+    var expected = new java.util.ArrayList<>(java.util.List.of("fixture-runtime", root.getPath()));
+    expected.addAll(
+        com.deepseekharness.app.util.ResourceGuardPolicy.limited(java.util.List.of("/bin/bash", "-l")));
+    assertArrayEquals(expected.toArray(new String[0]), result.argv());
     assertTrue(Arrays.asList(result.environment()).contains("FIXTURE_RUNTIME=1"));
     assertTrue(Arrays.asList(result.environment()).contains("DSHA_DNS_MODE=ipv4"));
     assertTrue(Arrays.asList(result.environment()).contains("LANG=C.UTF-8"));

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.deepseekharness.app.HarnessService
 import com.deepseekharness.app.core.ConfigStore
+import com.deepseekharness.app.core.PhoneAccess
 import com.deepseekharness.app.util.UiLanguagePreference
 import com.deepseekharness.app.util.UiText
 import com.deepseekharness.app.util.UiThemePreference
@@ -172,6 +173,39 @@ private fun ConnectionSection(context: Context, config: ConfigStore, nav: Settin
         config.setLanMode(it)
         ConfigFragment.applyLanMode(context, it)
         if (it) (context as? MainActivity)?.requestLocalNetwork()
+      },
+    )
+    var phone by remember { mutableStateOf(PhoneAccess.allowed(context)) }
+    SwitchPreference(
+      startAction = { HyIcon(R.drawable.ic_ui_shield) },
+      title = t("允许 AI 访问手机", "Allow AI to access the phone"),
+      summary =
+        if (phone) t("Linux 能读写手机存储，AI 可使用设备控制", "Linux can use phone storage; AI can use device control")
+        else t("Linux 碰不到手机存储，AI 不能操作手机；文件用「文件」页传", "Linux cannot touch phone storage or control the phone; use Files to move files"),
+      checked = phone,
+      onCheckedChange = { on ->
+        val apply = {
+          phone = on
+          PhoneAccess.set(context, on)
+          android.widget.Toast.makeText(
+            context,
+            t("重启 DSH 和终端后完全生效", "Fully applies after restarting DSH and terminals"),
+            android.widget.Toast.LENGTH_LONG,
+          ).show()
+        }
+        if (!on) apply()
+        else
+          DshaDialogBuilder(context)
+            .setTitle(t("允许 AI 访问手机？", "Allow AI to access the phone?"))
+            .setMessage(
+              t(
+                "打开后，手机存储会挂进 Linux（Download、Documents 可写），AI 还能通过设备桥启动应用、打开网页、改剪贴板，以及使用你在「设备控制」里授予的能力。\n\nLinux 里如果混进了恶意脚本，它也能做同样的事。只在需要时打开，用完关掉。",
+                "Phone storage is mounted into Linux (Download and Documents are writable), and the AI can launch apps, open links, change the clipboard and use whatever you grant in Device control.\n\nA malicious script in Linux could do the same. Turn this on only when needed.",
+              )
+            )
+            .setPositiveButton(t("打开", "Turn on")) { _, _ -> apply() }
+            .setNegativeButton(t("取消", "Cancel"), null)
+            .show()
       },
     )
     ArrowPreference(

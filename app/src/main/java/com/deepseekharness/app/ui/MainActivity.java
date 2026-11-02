@@ -251,7 +251,21 @@ public class MainActivity extends AppCompatActivity {
     dismissEntryOverlay(0);
     android.view.View.OnClickListener recovery =
         v -> {
-          if (com.deepseekharness.app.core.BackupTask.get(this).maintenanceBusy()
+          String guard = com.deepseekharness.app.runtime.ResourceGuard.trippedText(this);
+          if (guard != null)
+            new DshaDialogBuilder(this)
+                .setTitle(com.deepseekharness.app.util.UiText.choose("已停止 Linux 以保护手机", "Linux stopped to protect the phone"))
+                .setMessage(
+                    guard
+                        + com.deepseekharness.app.util.UiText.choose(
+                            "\n\n确认后才能再次启动 DSH 或终端。如果是 Linux 里的脚本造成的，再次启动前先处理掉它。",
+                            "\n\nDSH and terminals can start again only after you confirm. If a script in Linux caused this, deal with it before starting again."))
+                .setPositiveButton(
+                    com.deepseekharness.app.util.UiText.choose("确认，允许启动", "Confirm, allow start"),
+                    (d, w) -> com.deepseekharness.app.runtime.ResourceGuard.acknowledge(this))
+                .setNegativeButton(com.deepseekharness.app.util.UiText.choose("取消", "Cancel"), null)
+                .show();
+          else if (com.deepseekharness.app.core.BackupTask.get(this).maintenanceBusy()
               || BackgroundTasksActivity.busy(this)) BackgroundTasksActivity.open(this);
           else if (controller.config().isStartupRecoveryRequested()
               || EnvironmentUiStatus.get(this).repairs)
@@ -855,6 +869,7 @@ public class MainActivity extends AppCompatActivity {
                   + ":"
                   + EnvironmentUiStatus.get(MainActivity.this).repairs;
           if (startupRecovery
+              && com.deepseekharness.app.runtime.ResourceGuard.trippedText(MainActivity.this) == null
               && !limited
               && !busy
               && !com.deepseekharness.app.core.MaintenanceCoordinator.isEnvironmentTaskBusy()
@@ -874,9 +889,16 @@ public class MainActivity extends AppCompatActivity {
         }
       };
 
-  /** 顶部提示卡的三种情况：维护任务进行中 > 受限模式 > 上次启动未完成。点击行为见 showMain。 */
+  /** 顶部提示卡：资源保护已停止 Linux > 维护任务进行中 > 受限模式 > 上次启动未完成。点击行为见 showMain。 */
   private void showBanner(boolean busy, boolean limited, boolean startupRecovery) {
-    if (busy) {
+    String guard = com.deepseekharness.app.runtime.ResourceGuard.trippedText(this);
+    if (guard != null) {
+      chrome.setBannerKind(2);
+      chrome.setBannerTitle(
+          com.deepseekharness.app.util.UiText.choose("已停止 Linux 以保护手机", "Linux stopped to protect the phone"));
+      chrome.setBannerSummary(
+          guard + com.deepseekharness.app.util.UiText.choose(" · 点击确认", " · Tap to confirm"));
+    } else if (busy) {
       com.deepseekharness.app.util.BackupTaskState.Snapshot task =
           com.deepseekharness.app.core.BackupTask.get(this).snapshot();
       boolean preview =

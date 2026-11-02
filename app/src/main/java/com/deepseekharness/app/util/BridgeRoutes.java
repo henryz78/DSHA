@@ -56,6 +56,29 @@ public final class BridgeRoutes {
 
   private static final Map<String, Route> EXACT = exactRoutes();
 
+  /** 关闭「允许 AI 访问手机」时仍可用的接口：只通知/提问用户或报告状态，不碰手机。其余一律拒绝，新接口默认也拒绝。 */
+  private static final java.util.Set<Route> PHONE_FREE =
+      java.util.EnumSet.of(
+          Route.NOTIFY,
+          Route.TASK_CONTEXT,
+          Route.TASK_EVENT,
+          Route.TASK_CLAIM,
+          Route.TASK_ACK,
+          Route.CONSENT_POLICY,
+          Route.TOAST,
+          Route.HEALTH,
+          Route.DEVICE,
+          Route.VIBRATE,
+          Route.ASK,
+          Route.VERSION,
+          Route.HELP,
+          Route.PLUGINS,
+          Route.UNKNOWN);
+
+  public static boolean phoneFree(Route route) {
+    return PHONE_FREE.contains(route);
+  }
+
   private BridgeRoutes() {}
 
   private static Map<String, Route> exactRoutes() {

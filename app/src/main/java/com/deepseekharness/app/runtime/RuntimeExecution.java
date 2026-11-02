@@ -109,7 +109,10 @@ final class RuntimeExecution {
       throw new IllegalStateException(detail, error);
     }
     File home = new File(rootfs, "root"), link = new File(home, "手机存储");
-    if (home.isDirectory() && !link.exists() && !Compat.isSymbolicLink(link))
+    if (!com.deepseekharness.app.core.PhoneAccess.allowed(context)) {
+      // 没挂手机存储时这个链接只会悬空；只删链接本身，不碰目标。
+      if (Compat.isSymbolicLink(link)) link.delete();
+    } else if (home.isDirectory() && !link.exists() && !Compat.isSymbolicLink(link))
       try {
         Compat.symlink("/sdcard", link);
       } catch (IOException | RuntimeException error) {

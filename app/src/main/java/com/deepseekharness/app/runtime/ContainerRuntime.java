@@ -107,7 +107,7 @@ public interface ContainerRuntime {
       argv.add("-0");
       argv.add("--rootfs=" + rootfsDir.getAbsolutePath());
       argv.add("--cwd=/root");
-      for (Bind b : binds()) {
+      for (Bind b : binds(context)) {
         if (!new File(b.host()).exists()) {
           if (context != null)
             RuntimeHostPorts.fromOwner(context.getApplicationContext())
@@ -251,7 +251,7 @@ public interface ContainerRuntime {
       argv.add("-0");
       argv.add("-w");
       argv.add("/root");
-      for (Bind b : binds()) {
+      for (Bind b : binds(ctx)) {
         if (!new File(b.host()).exists()) {
           RuntimeHostPorts.fromOwner(ctx.getApplicationContext())
               .record("BIND_SKIPPED", b.host() + ": missing or inaccessible");
@@ -333,8 +333,15 @@ public interface ContainerRuntime {
         new Bind("/sys", "/sys"),
         new Bind("/system", "/system"),
         new Bind("/apex", "/apex"),
-        new Bind("/proc/self/fd", "/dev/fd"),
-        new Bind("/storage/emulated/0", "/sdcard"),
-        new Bind("/storage/emulated/0", "/storage/emulated/0"));
+        new Bind("/proc/self/fd", "/dev/fd"));
+  }
+
+  /** 手机存储只在用户打开「允许 AI 访问手机」后才挂进 Linux。 */
+  static java.util.List<Bind> binds(Context context) {
+    if (!com.deepseekharness.app.core.PhoneAccess.allowed(context)) return binds();
+    java.util.List<Bind> all = new ArrayList<>(binds());
+    all.add(new Bind("/storage/emulated/0", "/sdcard"));
+    all.add(new Bind("/storage/emulated/0", "/storage/emulated/0"));
+    return all;
   }
 }

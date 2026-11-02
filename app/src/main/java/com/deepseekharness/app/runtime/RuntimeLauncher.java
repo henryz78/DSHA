@@ -8,7 +8,7 @@ import java.util.List;
 
 /** One argv/env/process construction path; callers retain lifecycle and exit-proof ownership. */
 final class RuntimeLauncher {
-  private final Context context;
+  final Context context;
   private final File rootfs, base, lib, tmp;
   private final RuntimeHostPorts ports;
 
@@ -36,9 +36,8 @@ final class RuntimeLauncher {
         argv.add("-b");
         argv.add(bind.host() + ":" + bind.guest());
       }
-      argv.add("/bin/bash");
-      argv.add("-c");
-      argv.add(command);
+      int guest = argv.size();
+      argv.addAll(ResourceGuard.guest(context, List.of("/bin/bash", "-c", command)));
       ProcessBuilder builder = new ProcessBuilder(argv).redirectErrorStream(true);
       if (!spec.isolated && !spec.pipedInput) Compat.redirectStdinDevNull(builder);
       environment(builder, spec, preloads);
@@ -54,7 +53,7 @@ final class RuntimeLauncher {
                 + " staticLoader="
                 + builder.environment().containsKey("PROROOT_STUB_LOADER")
                 + " argv="
-                + argv.subList(0, argv.size() - 3));
+                + argv.subList(0, guest));
       return builder;
     }
   }

@@ -49,11 +49,15 @@ final class TerminalRuntime {
       throws IOException {
     List<String> argv = spec.runtime.baseArgv(rootfs, spec.hardlinks, spec.dataDomain);
     launcher.bindPreloads(argv);
-    if (guestCommand == null || guestCommand.length == 0) {
-      argv.add("/bin/bash");
-      argv.add("-c");
-      argv.add("stty sane 2>/dev/null || stty echo icanon 2>/dev/null || true; exec /bin/bash -l");
-    } else java.util.Collections.addAll(argv, guestCommand);
+    argv.addAll(
+        ResourceGuard.guest(
+            launcher.context,
+            guestCommand == null || guestCommand.length == 0
+                ? List.of(
+                    "/bin/bash",
+                    "-c",
+                    "stty sane 2>/dev/null || stty echo icanon 2>/dev/null || true; exec /bin/bash -l")
+                : List.of(guestCommand)));
     ProcessBuilder probe = new ProcessBuilder("/system/bin/true");
     launcher.environment(probe, spec);
     probe.environment().put("LANG", "C.UTF-8");
@@ -79,7 +83,7 @@ final class TerminalRuntime {
         LaunchSpec spec = spec();
         List<String> argv = spec.runtime.baseArgv(rootfs, spec.hardlinks, spec.dataDomain);
         execution.launcher().bindPreloads(argv);
-        argv.add("/bin/bash");
+        argv.addAll(ResourceGuard.guest(context, List.of("/bin/bash")));
         ProcessBuilder builder = new ProcessBuilder(argv).redirectErrorStream(true);
         execution.launcher().environment(builder, spec);
         builder.environment().put("DSH_CONFIRM", "0");

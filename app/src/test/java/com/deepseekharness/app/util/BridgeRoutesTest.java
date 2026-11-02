@@ -79,4 +79,21 @@ public final class BridgeRoutesTest {
       assertFalse(route.name(), route.commandParameter());
     }
   }
+
+  @Test
+  public void phoneAccessOffBlocksEverythingThatTouchesThePhone() {
+    for (BridgeRoutes.Route route :
+        new BridgeRoutes.Route[] {
+          BridgeRoutes.Route.UI, BridgeRoutes.Route.VSCREEN, BridgeRoutes.Route.EXEC,
+          BridgeRoutes.Route.CONFIRM, BridgeRoutes.Route.DEVICE_PLAN, BridgeRoutes.Route.DEVICE_EXECUTE,
+          BridgeRoutes.Route.DEVICE_VSCREEN_START, BridgeRoutes.Route.DEVICE_VSCREEN_COMMIT,
+          BridgeRoutes.Route.EXPORT, BridgeRoutes.Route.READ_FILE, BridgeRoutes.Route.LAUNCH,
+          BridgeRoutes.Route.OPEN, BridgeRoutes.Route.SHARE, BridgeRoutes.Route.CLIP,
+          BridgeRoutes.Route.APPS, BridgeRoutes.Route.OVERLAY, BridgeRoutes.Route.LOCATION,
+          BridgeRoutes.Route.SENSOR, BridgeRoutes.Route.SENSORS, BridgeRoutes.Route.TORCH
+        })
+      assertFalse(route.name(), BridgeRoutes.phoneFree(route));
+    assertTrue(BridgeRoutes.phoneFree(BridgeRoutes.Route.ASK));
+    assertTrue(BridgeRoutes.phoneFree(BridgeRoutes.Route.VERSION));
+  }
 }
